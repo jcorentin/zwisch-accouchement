@@ -4,6 +4,7 @@ import gleam/dynamic/decode.{type Decoder}
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/string
 import icons
 import lustre
 import lustre/attribute
@@ -47,7 +48,7 @@ type Model {
 }
 
 type Profil {
-  Profil(name: Option(String), sexe: Option(Sexe), semestre: Option(Semestre))
+  Profil(name: Option(String), sexe: Option(String), semestre: Option(String))
 }
 
 fn empty_profil() {
@@ -58,85 +59,26 @@ fn decode_profil() -> Decoder(Profil) {
   use name <- decode.field("name", decode.string)
   use semestre <- decode.field("semestre", decode.string)
   use sexe <- decode.field("sexe", decode.string)
-  let semestre = decode_semestre(semestre)
-  let sexe = decode_sexe(sexe)
-  case semestre, sexe {
-    Ok(semestre), Ok(sexe) ->
-      decode.success(Profil(
-        name: Some(name),
-        semestre: Some(semestre),
-        sexe: Some(sexe),
-      ))
-    _, _ ->
-      decode.failure(Profil(name: None, semestre: None, sexe: None), "Profil")
-  }
+  decode.success(Profil(
+    name: string.to_option(name),
+    semestre: string.to_option(semestre),
+    sexe: string.to_option(sexe),
+  ))
 }
 
 fn encode_profil(profil: Profil) -> String {
   [
-    option.map(profil.name, fn(name) { #("name", json.string(name)) }),
-    option.map(profil.sexe, fn(sexe) {
-      #("sexe", sexe |> encode_sexe |> json.string)
-    }),
-    option.map(profil.semestre, fn(semestre) {
-      #("semestre", semestre |> encode_semestre |> json.string)
-    }),
+    #("name", profil.name),
+    #("sexe", profil.sexe),
+    #("semestre", profil.semestre),
   ]
+  |> list.map(fn(item) {
+    let #(key, value) = item
+    option.map(value, fn(value) { #(key, json.string(value)) })
+  })
   |> option.values
   |> json.object
   |> json.to_string
-}
-
-type Sexe {
-  Femme
-  Homme
-}
-
-fn decode_sexe(sexe: String) -> Result(Sexe, String) {
-  case sexe {
-    "homme" -> Ok(Homme)
-    "femme" -> Ok(Femme)
-    _ -> Error("Failed to parse sexe")
-  }
-}
-
-fn encode_sexe(sexe: Sexe) -> String {
-  case sexe {
-    Femme -> "femme"
-    Homme -> "homme"
-  }
-}
-
-type Semestre {
-  Ps
-  Pa2
-  Pa3
-  Pa4
-  Dj1
-  Dj2
-}
-
-fn decode_semestre(semestre: String) -> Result(Semestre, String) {
-  case semestre {
-    "ps" -> Ok(Ps)
-    "pa2" -> Ok(Pa2)
-    "pa3" -> Ok(Pa3)
-    "pa4" -> Ok(Pa4)
-    "dj1" -> Ok(Dj1)
-    "dj2" -> Ok(Dj2)
-    _ -> Error("Failed to parse semestre")
-  }
-}
-
-fn encode_semestre(semestre: Semestre) -> String {
-  case semestre {
-    Ps -> "ps"
-    Pa2 -> "pa2"
-    Pa3 -> "pa3"
-    Pa4 -> "pa4"
-    Dj1 -> "dj1"
-    Dj2 -> "dj2"
-  }
 }
 
 type Page {
@@ -675,23 +617,20 @@ fn view_profil_form(profil: Profil) -> Element(Msg) {
       use sexe <- form.parameter
       use semestre <- form.parameter
 
-      Profil(name: None, sexe: Some(sexe), semestre: Some(semestre))
+      Profil(
+        name: None,
+        sexe: string.to_option(sexe),
+        semestre: string.to_option(semestre),
+      )
     })
     |> form.with_values(form_data)
-    |> form.field("sexe", decode_sexe)
-    |> form.field("semestre", decode_semestre)
+    |> form.field("sexe", form.string)
+    |> form.field("semestre", form.string)
     |> form.finish
     |> UserSubmittedProfilForm()
   }
-  let sexe = case profil.sexe {
-    Some(sexe) -> encode_sexe(sexe)
-    None -> ""
-  }
-
-  let semestre = case profil.semestre {
-    Some(semestre) -> encode_semestre(semestre)
-    None -> ""
-  }
+  let sexe = option.unwrap(profil.sexe, "")
+  let semestre = option.unwrap(profil.semestre, "")
 
   html.form([event.on_submit(handle_submit), attribute.class("")], [
     fieldset_sexe(sexe),
@@ -771,7 +710,7 @@ fn view_accouchement(accouchement: AccouchementFormState) -> Element(Msg) {
 
 fn main_form(accouchement: AccouchementFormState) -> Element(Msg) {
   let validate_profil = fn() {
-    Ok(Profil(name: None, sexe: Some(Homme), semestre: Some(Pa2)))
+    Ok(Profil(name: None, sexe: Some("homme"), semestre: Some("pa2")))
   }
   let validate_accouchement = fn() {
     Ok(Accouchement(
@@ -851,14 +790,8 @@ fn main_form(accouchement: AccouchementFormState) -> Element(Msg) {
 
   let questions = case accouchement.profil {
     Some(profil) -> {
-      let checked_semestre = case profil.semestre {
-        Some(semestre) -> encode_semestre(semestre)
-        None -> ""
-      }
-      let checked_sexe = case profil.sexe {
-        Some(sexe) -> encode_sexe(sexe)
-        None -> ""
-      }
+      let checked_semestre = option.unwrap(profil.semestre, "")
+      let checked_sexe = option.unwrap(profil.sexe, "")
       [
         fieldset_sexe(checked_sexe),
         fieldset_semestre(checked_semestre),
