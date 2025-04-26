@@ -84,7 +84,7 @@ fn encode_profil(profil: Profil) -> String {
 type Page {
   AccueilPage
   LoginPage
-  AccouchementPage(AccouchementFormState)
+  AccouchementPage(#(Option(Profil), Accouchement))
   ProfilPage
 }
 
@@ -97,79 +97,114 @@ fn page_name(page: Page) {
   }
 }
 
-type SomeAutonomieRaisonState {
-  Proposed(String)
-  Other(String)
+type Raison {
+  RaisonProposee(String)
+  RaisonLibre(String)
+  RaisonNone
 }
 
-type AutonomieRaisonState =
-  Option(SomeAutonomieRaisonState)
-
-fn encode_autonomie_raison(raison: AutonomieRaisonState) {
+fn encode_raison(raison: Raison) {
   case raison {
-    Some(Proposed(choice)) -> choice
-    Some(Other(choice)) -> choice
-    None -> ""
+    RaisonProposee(choice) -> choice
+    RaisonLibre(choice) -> choice
+    RaisonNone -> ""
   }
 }
 
-type AccouchementFormState {
-  AccouchementFormState(
-    profil: Option(Profil),
-    poste_chef: String,
-    moment: String,
-    instrument: String,
-    autonomie: String,
-    raison: AutonomieRaisonState,
-  )
-}
-
-fn empty_form_state() {
-  AccouchementFormState(
-    profil: None,
-    poste_chef: "",
-    moment: "",
-    instrument: "",
-    autonomie: "",
-    raison: None,
-  )
-}
-
-pub type Accouchement {
+type Accouchement {
   Accouchement(
-    poste_chef: String,
-    moment: String,
-    instrument: String,
-    autonomie: String,
-    raison: String,
+    user: String,
+    poste_chef: Option(String),
+    moment: Option(String),
+    instrument: Option(String),
+    autonomie: Option(String),
+    raison: Raison,
   )
 }
 
-pub fn decode_accouchement() {
+fn empty_accouchement(user_id: String) {
+  Accouchement(
+    user: user_id,
+    poste_chef: None,
+    moment: None,
+    instrument: None,
+    autonomie: None,
+    raison: RaisonNone,
+  )
+}
+
+fn decode_accouchement() {
+  use user <- decode.field("user", decode.string)
   use poste_chef <- decode.field("poste_chef", decode.string)
   use moment <- decode.field("moment", decode.string)
   use instrument <- decode.field("instrument", decode.string)
   use autonomie <- decode.field("autonomie", decode.string)
-  use autonomie_raison <- decode.field("autonomie_raison", decode.string)
+  use raison <- decode.field("autonomie_raison", decode.string)
+  let raisons_proposees = [
+    "geste_difficile", "situation_urgence", "manque_confiance",
+    "changement_instrument", "cas_particulier", "guidance_technique",
+    "manque_experience", "changement_instrument", "execution_rapide",
+    "niveau_interne", "environnement_favorable", "gestes_interne",
+  ]
+  let is_raison_proposee = list.contains(raisons_proposees, raison)
+  let raison = case raison {
+    "" -> RaisonNone
+    raison if is_raison_proposee -> RaisonProposee(raison)
+    raison -> RaisonLibre(raison)
+  }
   decode.success(Accouchement(
-    poste_chef: poste_chef,
-    moment: moment,
-    instrument: instrument,
-    autonomie: autonomie,
-    raison: autonomie_raison,
+    user:,
+    poste_chef: string.to_option(poste_chef),
+    moment: string.to_option(moment),
+    instrument: string.to_option(instrument),
+    autonomie: string.to_option(autonomie),
+    raison:,
   ))
 }
 
-pub fn encode_accouchement(user_id: String, accouchement: Accouchement) {
+fn encode_accouchement(acc: Accouchement) {
+  let to_string = fn(opt) { option.unwrap(opt, "") |> json.string }
   json.object([
-    #("user", json.string(user_id)),
-    #("poste_chef", json.string(accouchement.poste_chef)),
-    #("moment", json.string(accouchement.moment)),
-    #("instrument", json.string(accouchement.instrument)),
-    #("autonomie", json.string(accouchement.autonomie)),
-    #("autonomie_raison", json.string(accouchement.raison)),
+    #("user", json.string(acc.user)),
+    #("poste_chef", to_string(acc.poste_chef)),
+    #("moment", to_string(acc.moment)),
+    #("instrument", to_string(acc.instrument)),
+    #("autonomie", to_string(acc.autonomie)),
+    #("autonomie_raison", acc.raison |> encode_raison |> json.string),
   ])
   |> json.to_string()
+}
+
+fn validate_accouchement(acc: Accouchement) {
+  let validate_fields =
+    [
+      #("poste_chef", acc.poste_chef),
+      #("moment", acc.moment),
+      #("instrument", acc.instrument),
+      #("autonomie", acc.autonomie),
+    ]
+    |> list.map(fn(item) {
+      let #(name, value) = item
+      option.to_result(value, #(name, "empty_error"))
+    })
+  let validate_raison = case acc.raison {
+    RaisonNone -> Error(#("autonomie_raison", "empty_error"))
+    RaisonLibre("") -> Error(#("autonomie_raison", "empty_other_error"))
+    _ -> Ok("")
+  }
+
+  let errors =
+    [validate_raison, ..validate_fields]
+    |> list.filter_map(fn(item) {
+      case item {
+        Error(err) -> Ok(err)
+        Ok(_) -> Error(Nil)
+      }
+    })
+  case list.is_empty(errors) {
+    True -> Ok(acc)
+    False -> Error(errors)
+  }
 }
 
 // UPDATE ----------------------------------------------------------------------
@@ -183,9 +218,9 @@ type Msg {
   UserSubmittedLoginForm(Result(LoginData, form.Form))
   UserClickedDock(String)
   UserClickedLogout
-  UserSubmittedProfilForm(Result(Profil, form.Form))
+  UserSubmittedProfil(Result(Profil, form.Form))
   ApiReturnedProfil(Result(Profil, rsvp.Error))
-  UserSubmittedAccouchementForm(Result(#(Option(Profil), Accouchement), Nil))
+  UserSubmittedAccouchement(Result(#(Option(Profil), Accouchement), Nil))
   ApiReturnedAccouchement(Result(Accouchement, rsvp.Error))
   UserChangedSexe(String)
   UserChangedSemestre(String)
@@ -213,41 +248,44 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserSubmittedLoginForm(_) -> #(model, effect.none())
 
     UserChangedAutonomie(new_autonomie) -> {
-      let assert AccouchementPage(form_state) = model.page
-      let new_accouchement =
-        AccouchementFormState(
-          ..form_state,
-          autonomie: new_autonomie,
-          raison: None,
-        )
-      #(Model(..model, page: AccouchementPage(new_accouchement)), effect.none())
+      let assert AccouchementPage(#(profil, acc)) = model.page
+      let new_acc =
+        Accouchement(..acc, autonomie: Some(new_autonomie), raison: RaisonNone)
+      #(
+        Model(..model, page: AccouchementPage(#(profil, new_acc))),
+        effect.none(),
+      )
     }
     UserChangedRaison("autre") -> {
-      let assert AccouchementPage(form_state) = model.page
-      let new_accouchement =
-        AccouchementFormState(..form_state, raison: Some(Other("")))
-      #(Model(..model, page: AccouchementPage(new_accouchement)), effect.none())
+      let assert AccouchementPage(#(profil, acc)) = model.page
+      let new_acc = Accouchement(..acc, raison: RaisonLibre(""))
+      #(
+        Model(..model, page: AccouchementPage(#(profil, new_acc))),
+        effect.none(),
+      )
     }
     UserChangedRaison(raison) -> {
-      let assert AccouchementPage(form_state) = model.page
-      let new_accouchement =
-        AccouchementFormState(..form_state, raison: Some(Proposed(raison)))
-      #(Model(..model, page: AccouchementPage(new_accouchement)), effect.none())
+      let assert AccouchementPage(#(profil, acc)) = model.page
+      let new_acc = Accouchement(..acc, raison: RaisonProposee(raison))
+      #(
+        Model(..model, page: AccouchementPage(#(profil, new_acc))),
+        effect.none(),
+      )
     }
 
-    UserSubmittedAccouchementForm(Ok(#(new_profil, new_accouchement))) -> {
+    UserSubmittedAccouchement(Ok(#(new_profil, new_accouchement))) -> {
       #(model, {
         case new_profil {
           Some(new_profil) ->
             effect.batch([
-              update_profil(model.pb, new_profil, ApiReturnedProfil),
-              create_record(model.pb, new_accouchement),
+              submit_profil(model.pb, new_profil, ApiReturnedProfil),
+              submit_accouchement(model.pb, new_accouchement),
             ])
-          None -> create_record(model.pb, new_accouchement)
+          None -> submit_accouchement(model.pb, new_accouchement)
         }
       })
     }
-    UserSubmittedAccouchementForm(Error(_)) -> todo
+    UserSubmittedAccouchement(Error(_)) -> todo
     ApiReturnedAccouchement(Ok(_accouchement)) -> todo
     ApiReturnedAccouchement(Error(_)) -> todo
     UserClickedLogout -> {
@@ -266,11 +304,21 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       #(Model(..model, pb:), effect.map(effect, PocketBaseMsg))
     }
     UserClickedDock(location) -> {
-      let page = case model.page, location {
-        _, "Accouchement" -> AccouchementPage(empty_form_state())
-        _, "Profil" -> ProfilPage
-        _, "Accueil" -> AccueilPage
-        _, _ -> model.page
+      let page = case location {
+        "Accouchement" -> {
+          let user_id = case model.pb.auth {
+            Some(auth) -> auth.user_id
+            None -> todo
+          }
+          let profil = case model.profil.sexe, model.profil.semestre {
+            Some(sexe), Some(semestre) -> None
+            sexe, semestre -> Some(Profil(name: None, sexe:, semestre:))
+          }
+          AccouchementPage(#(profil, empty_accouchement(user_id)))
+        }
+        "Profil" -> ProfilPage
+        "Accueil" -> AccueilPage
+        _ -> model.page
       }
       let model = Model(..model, page:)
       #(model, effect.none())
@@ -279,11 +327,11 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       #(Model(..model, profil: new_profil), effect.none())
     }
     ApiReturnedProfil(Error(_)) -> todo
-    UserSubmittedProfilForm(Ok(profil)) -> #(
+    UserSubmittedProfil(Ok(profil)) -> #(
       model,
-      update_profil(model.pb, profil, ApiReturnedProfil),
+      submit_profil(model.pb, profil, ApiReturnedProfil),
     )
-    UserSubmittedProfilForm(Error(_)) -> todo
+    UserSubmittedProfil(Error(_)) -> todo
     UserChangedSexe(_) -> todo
     UserChangedSemestre(_) -> todo
     UserChangedPosteChef(_) -> todo
@@ -302,7 +350,7 @@ fn get_profil(server: PocketBase, msg) {
   pb.get_one_record(server, "users", user_id, decode_profil(), msg)
 }
 
-fn update_profil(server: PocketBase, profil: Profil, msg) {
+fn submit_profil(server: PocketBase, profil: Profil, msg) {
   let user_id = case server.auth {
     Some(auth) -> auth.user_id
     None -> ""
@@ -317,15 +365,11 @@ fn update_profil(server: PocketBase, profil: Profil, msg) {
   )
 }
 
-fn create_record(pb: PocketBase, accouchement) {
-  let user_id = case pb.auth {
-    Some(auth) -> auth.user_id
-    option.None -> todo
-  }
+fn submit_accouchement(pb: PocketBase, acc: Accouchement) -> Effect(Msg) {
   pb.create_one_record(
     pb,
     "accouchements",
-    encode_accouchement(user_id, accouchement),
+    encode_accouchement(acc),
     decode_accouchement(),
     ApiReturnedAccouchement,
   )
@@ -340,8 +384,8 @@ fn view(model: Model) -> Element(Msg) {
       view_profil(model.profil)
       |> base_view(page)
     LoginPage -> view_login()
-    AccouchementPage(form_state) ->
-      view_accouchement(form_state)
+    AccouchementPage(#(profil, acc)) ->
+      view_accouchement(profil, acc)
       |> base_view(page)
     AccueilPage ->
       view_accueil()
@@ -546,7 +590,7 @@ fn fieldset_autonomie_raison_aide_active(
         html.text("Le geste nécessitait une guidance technique"),
       ),
       #(
-        "manque_expérience",
+        "manque_experience",
         html.text("L’interne manquait d’expérience sur ce geste"),
       ),
       #("changement_instrument", html.text("Changement d’instrument")),
@@ -627,7 +671,7 @@ fn view_profil_form(profil: Profil) -> Element(Msg) {
     |> form.field("sexe", form.string)
     |> form.field("semestre", form.string)
     |> form.finish
-    |> UserSubmittedProfilForm()
+    |> UserSubmittedProfil()
   }
   let sexe = option.unwrap(profil.sexe, "")
   let semestre = option.unwrap(profil.semestre, "")
@@ -704,26 +748,13 @@ fn view_accueil() {
   ])
 }
 
-fn view_accouchement(accouchement: AccouchementFormState) -> Element(Msg) {
-  html.div([attribute.class("")], [main_form(accouchement)])
-}
-
-fn main_form(accouchement: AccouchementFormState) -> Element(Msg) {
+fn view_accouchement(profil: Option(Profil), acc: Accouchement) -> Element(Msg) {
   let validate_profil = fn() {
     Ok(Profil(name: None, sexe: Some("homme"), semestre: Some("pa2")))
   }
-  let validate_accouchement = fn() {
-    Ok(Accouchement(
-      poste_chef: accouchement.poste_chef,
-      moment: accouchement.moment,
-      instrument: accouchement.instrument,
-      autonomie: accouchement.autonomie,
-      raison: encode_autonomie_raison(accouchement.raison),
-    ))
-  }
   let handle_submit = fn() -> Msg {
-    let accouchement_form = validate_accouchement()
-    case accouchement.profil {
+    let accouchement_form = validate_accouchement(acc)
+    case profil {
       Some(_) -> {
         case validate_profil(), accouchement_form {
           Ok(profil_form), Ok(accouchement) ->
@@ -738,39 +769,39 @@ fn main_form(accouchement: AccouchementFormState) -> Element(Msg) {
         }
       }
     }
-    |> UserSubmittedAccouchementForm
+    |> UserSubmittedAccouchement
   }
-  let raison_radio_checked = case accouchement.raison {
-    Some(Proposed(raison)) -> raison
-    Some(Other(_raison)) -> "autre"
-    None -> ""
+  let raison_radio_checked = case acc.raison {
+    RaisonProposee(raison) -> raison
+    RaisonLibre(_raison) -> "autre"
+    RaisonNone -> ""
   }
-  let raison_other_is_disabled = case accouchement.raison {
-    Some(Proposed(_raison)) -> True
-    Some(Other(_raison)) -> False
-    None -> True
+  let raison_other_is_disabled = case acc.raison {
+    RaisonProposee(_raison) -> True
+    RaisonLibre(_raison) -> False
+    RaisonNone -> True
   }
-  let raison_other_input_value = case accouchement.raison {
-    Some(Other(raison)) -> raison
+  let raison_other_input_value = case acc.raison {
+    RaisonLibre(raison) -> raison
     _ -> ""
   }
 
-  let questions = case accouchement.autonomie {
-    "observe" -> [
+  let questions = case acc.autonomie {
+    Some("observe") -> [
       fieldset_autonomie_raison_observe(
         raison_radio_checked,
         raison_other_is_disabled,
         raison_other_input_value,
       ),
     ]
-    "aide_active" -> [
+    Some("aide_active") -> [
       fieldset_autonomie_raison_aide_active(
         raison_radio_checked,
         raison_other_is_disabled,
         raison_other_input_value,
       ),
     ]
-    "aide_mineure" -> [
+    Some("aide_mineure") -> [
       fieldset_autonomie_raison_aide_mineure(
         raison_radio_checked,
         raison_other_is_disabled,
@@ -781,20 +812,18 @@ fn main_form(accouchement: AccouchementFormState) -> Element(Msg) {
   }
 
   let questions = [
-    fieldset_poste_chef(accouchement.poste_chef),
-    fieldset_moment(accouchement.moment),
-    fieldset_instrument(accouchement.instrument),
-    fieldset_autonomie(accouchement.autonomie),
+    fieldset_poste_chef(option.unwrap(acc.poste_chef, "")),
+    fieldset_moment(option.unwrap(acc.moment, "")),
+    fieldset_instrument(option.unwrap(acc.instrument, "")),
+    fieldset_autonomie(option.unwrap(acc.autonomie, "")),
     ..questions
   ]
 
-  let questions = case accouchement.profil {
+  let questions = case profil {
     Some(profil) -> {
-      let checked_semestre = option.unwrap(profil.semestre, "")
-      let checked_sexe = option.unwrap(profil.sexe, "")
       [
-        fieldset_sexe(checked_sexe),
-        fieldset_semestre(checked_semestre),
+        fieldset_sexe(option.unwrap(profil.semestre, "")),
+        fieldset_semestre(option.unwrap(profil.sexe, "")),
         ..questions
       ]
     }
