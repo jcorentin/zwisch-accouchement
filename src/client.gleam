@@ -401,10 +401,19 @@ fn view(model: Model) -> Element(Msg) {
 }
 
 fn base_view(inner: Element(Msg), page: Page) -> Element(Msg) {
+  let buttons = [
+    #("Accueil", icons.home_icon()),
+    #("Accouchement", icons.baby_icon()),
+    #("Profil", icons.user_icon()),
+  ]
   html.div([attribute.class("min-h-full mx-auto bg-base-100")], [
     nav_bar(),
     html.div([attribute.class("px-4 py-8 mx-auto max-w-[100rem]")], [inner]),
-    dock(page_name(page)),
+    components.render_dock(
+      buttons:,
+      active_page: page_name(page),
+      on_click: UserClickedDock,
+    ),
   ])
 }
 
@@ -414,37 +423,6 @@ fn nav_bar() {
     html.div([attribute.class("navbar-center")], [html.text("Test")]),
     html.div([attribute.class("navbar-end")], []),
   ])
-}
-
-fn dock(current_page_name: String) {
-  let buttons_data = [
-    #("Accueil", icons.home_icon()),
-    #("Accouchement", icons.baby_icon()),
-    #("Profil", icons.user_icon()),
-  ]
-  let mark_active = fn(button_page_name) {
-    case button_page_name == current_page_name {
-      True -> attribute.class("dock-active")
-      False -> attribute.none()
-    }
-  }
-  let make_button = fn(button_data) {
-    let #(button_page_name, button_icon) = button_data
-    html.button(
-      [
-        mark_active(button_page_name),
-        event.on_click(UserClickedDock(button_page_name)),
-      ],
-      [
-        button_icon,
-        html.span([attribute.class("dock-label")], [html.text(button_page_name)]),
-      ],
-    )
-  }
-  html.div(
-    [attribute.class("dock shadow-sm bg-base-200")],
-    list.map(buttons_data, make_button),
-  )
 }
 
 fn view_profil(profil: Option(Profil)) -> Element(Msg) {

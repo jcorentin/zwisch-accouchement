@@ -102,3 +102,30 @@ pub fn render_input_field(
     ]),
   ])
 }
+
+pub fn render_dock(
+  buttons buttons: List(#(String, Element(c))),
+  active_page active_page: String,
+  on_click message: fn(String) -> c,
+) -> Element(c) {
+  let render_dock_button = fn(button) {
+    let #(button_page_name, button_icon) = button
+    html.button(
+      [
+        case button_page_name == active_page {
+          True -> attribute.class("dock-active")
+          False -> attribute.none()
+        },
+        event.on_click(message(button_page_name)),
+      ],
+      [
+        button_icon,
+        html.span([attribute.class("dock-label")], [html.text(button_page_name)]),
+      ],
+    )
+  }
+  html.div(
+    [attribute.class("dock shadow-sm bg-base-200")],
+    list.map(buttons, render_dock_button),
+  )
+}

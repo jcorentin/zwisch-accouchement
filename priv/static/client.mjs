@@ -6045,6 +6045,36 @@ function render_autre_input_field(is_disabled, value2, on_input2) {
     on_input2
   );
 }
+function render_dock(buttons, active_page, message) {
+  let render_dock_button = (button2) => {
+    let button_page_name = button2[0];
+    let button_icon = button2[1];
+    return button(
+      toList([
+        (() => {
+          let $ = button_page_name === active_page;
+          if ($) {
+            return class$("dock-active");
+          } else {
+            return none();
+          }
+        })(),
+        on_click(message(button_page_name))
+      ]),
+      toList([
+        button_icon,
+        span(
+          toList([class$("dock-label")]),
+          toList([text3(button_page_name)])
+        )
+      ])
+    );
+  };
+  return div(
+    toList([class$("dock shadow-sm bg-base-200")]),
+    map(buttons, render_dock_button)
+  );
+}
 
 // build/dev/javascript/lustre/lustre/element/svg.mjs
 var namespace = "http://www.w3.org/2000/svg";
@@ -6903,43 +6933,12 @@ function nav_bar() {
     ])
   );
 }
-function dock(current_page_name) {
-  let buttons_data = toList([
+function base_view(inner, page) {
+  let buttons = toList([
     ["Accueil", home_icon()],
     ["Accouchement", baby_icon()],
     ["Profil", user_icon()]
   ]);
-  let mark_active = (button_page_name) => {
-    let $ = button_page_name === current_page_name;
-    if ($) {
-      return class$("dock-active");
-    } else {
-      return none();
-    }
-  };
-  let make_button = (button_data) => {
-    let button_page_name = button_data[0];
-    let button_icon = button_data[1];
-    return button(
-      toList([
-        mark_active(button_page_name),
-        on_click(new UserClickedDock(button_page_name))
-      ]),
-      toList([
-        button_icon,
-        span(
-          toList([class$("dock-label")]),
-          toList([text3(button_page_name)])
-        )
-      ])
-    );
-  };
-  return div(
-    toList([class$("dock shadow-sm bg-base-200")]),
-    map(buttons_data, make_button)
-  );
-}
-function base_view(inner, page) {
   return div(
     toList([class$("min-h-full mx-auto bg-base-100")]),
     toList([
@@ -6948,7 +6947,13 @@ function base_view(inner, page) {
         toList([class$("px-4 py-8 mx-auto max-w-[100rem]")]),
         toList([inner])
       ),
-      dock(page_name(page))
+      render_dock(
+        buttons,
+        page_name(page),
+        (var0) => {
+          return new UserClickedDock(var0);
+        }
+      )
     ])
   );
 }
