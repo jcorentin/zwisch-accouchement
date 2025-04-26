@@ -33,17 +33,25 @@ const server_port = 8090
 
 fn init(_args: Nil) -> #(Model, Effect(Msg)) {
   let model =
-    Model(pb: pb.new(server_host, server_port), profil: None, page: LoginPage)
+    Model(
+      pb: pb.new(server_host, server_port),
+      profil: empty_profil(),
+      page: LoginPage,
+    )
   let #(server, pb_effect) = pb.init(server_host, server_port)
   #(Model(..model, pb: server), effect.map(pb_effect, PocketBaseMsg))
 }
 
 type Model {
-  Model(pb: PocketBase, profil: Option(Profil), page: Page)
+  Model(pb: PocketBase, profil: Profil, page: Page)
 }
 
 type Profil {
   Profil(name: Option(String), sexe: Option(Sexe), semestre: Option(Semestre))
+}
+
+fn empty_profil() {
+  Profil(name: None, sexe: None, semestre: None)
 }
 
 fn decode_profil() -> Decoder(Profil) {
@@ -326,7 +334,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       #(model, effect.none())
     }
     ApiReturnedProfil(Ok(new_profil)) -> {
-      #(Model(..model, profil: Some(new_profil)), effect.none())
+      #(Model(..model, profil: new_profil), effect.none())
     }
     ApiReturnedProfil(Error(_)) -> todo
     UserSubmittedProfilForm(Ok(profil)) -> #(
@@ -424,7 +432,7 @@ fn nav_bar() {
   ])
 }
 
-fn view_profil(profil: Option(Profil)) -> Element(Msg) {
+fn view_profil(profil: Profil) -> Element(Msg) {
   html.div([attribute.class("")], [
     html.main([attribute.class("")], [view_profil_form(profil)]),
     html.button([attribute.class("btn"), event.on_click(UserClickedLogout)], [
@@ -661,7 +669,7 @@ fn fieldset_autonomie_raison_aide_mineure(
   |> components.render_radio_fieldset()
 }
 
-fn view_profil_form(profil: Option(Profil)) -> Element(Msg) {
+fn view_profil_form(profil: Profil) -> Element(Msg) {
   let handle_submit = fn(form_data) {
     form.decoding({
       use sexe <- form.parameter
@@ -675,17 +683,15 @@ fn view_profil_form(profil: Option(Profil)) -> Element(Msg) {
     |> form.finish
     |> UserSubmittedProfilForm()
   }
-  let sexe =
-    profil
-    |> option.then(fn(profil) { profil.sexe })
-    |> option.map(encode_sexe)
-    |> option.unwrap("")
+  let sexe = case profil.sexe {
+    Some(sexe) -> encode_sexe(sexe)
+    None -> ""
+  }
 
-  let semestre =
-    profil
-    |> option.then(fn(profil) { profil.semestre })
-    |> option.map(encode_semestre)
-    |> option.unwrap("")
+  let semestre = case profil.semestre {
+    Some(semestre) -> encode_semestre(semestre)
+    None -> ""
+  }
 
   html.form([event.on_submit(handle_submit), attribute.class("")], [
     fieldset_sexe(sexe),
