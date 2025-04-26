@@ -294,10 +294,10 @@ var Error = class extends Result {
   }
 };
 function isEqual(x, y) {
-  let values3 = [x, y];
-  while (values3.length) {
-    let a = values3.pop();
-    let b = values3.pop();
+  let values4 = [x, y];
+  while (values4.length) {
+    let a = values4.pop();
+    let b = values4.pop();
     if (a === b) continue;
     if (!isObject(a) || !isObject(b)) return false;
     let unequal = !structurallyCompatibleObjects(a, b) || unequalDates(a, b) || unequalBuffers(a, b) || unequalArrays(a, b) || unequalMaps(a, b) || unequalSets(a, b) || unequalRegExps(a, b);
@@ -312,7 +312,7 @@ function isEqual(x, y) {
     }
     let [keys2, get2] = getters(a);
     for (let k of keys2(a)) {
-      values3.push(get2(a, k), get2(b, k));
+      values4.push(get2(a, k), get2(b, k));
     }
   }
   return true;
@@ -380,6 +380,42 @@ function unwrap(option, default$) {
   } else {
     return default$;
   }
+}
+function map(option, fun) {
+  if (option instanceof Some) {
+    let x = option[0];
+    return new Some(fun(x));
+  } else {
+    return new None();
+  }
+}
+function then$(option, fun) {
+  if (option instanceof Some) {
+    let x = option[0];
+    return fun(x);
+  } else {
+    return new None();
+  }
+}
+function values_loop(list4, acc) {
+  if (list4.hasLength(0)) {
+    return acc;
+  } else {
+    let first2 = list4.head;
+    let rest = list4.tail;
+    let accumulate = (acc2, item) => {
+      if (item instanceof Some) {
+        let value2 = item[0];
+        return prepend(value2, acc2);
+      } else {
+        return acc2;
+      }
+    };
+    return accumulate(values_loop(rest, acc), first2);
+  }
+}
+function values(options) {
+  return values_loop(options, toList([]));
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/order.mjs
@@ -469,7 +505,7 @@ function map_loop(loop$list, loop$fun, loop$acc) {
     }
   }
 }
-function map(list4, fun) {
+function map2(list4, fun) {
   return map_loop(list4, fun, toList([]));
 }
 function append_loop(loop$first, loop$second) {
@@ -944,7 +980,7 @@ function is_ok(result) {
     return true;
   }
 }
-function map2(result, fun) {
+function map3(result, fun) {
   if (result.isOk()) {
     let x = result[0];
     return new Ok(fun(x));
@@ -971,7 +1007,7 @@ function try$(result, fun) {
     return new Error(e);
   }
 }
-function then$(result, fun) {
+function then$2(result, fun) {
   return try$(result, fun);
 }
 function unwrap2(result, default$) {
@@ -990,7 +1026,7 @@ function replace_error(result, error) {
     return new Error(error);
   }
 }
-function values2(results) {
+function values3(results) {
   return filter_map(results, (r) => {
     return r;
   });
@@ -1825,23 +1861,23 @@ function upsert(dict2, key2, fun) {
 
 // build/dev/javascript/formal/formal/form.mjs
 var Form = class extends CustomType {
-  constructor(values3, errors) {
+  constructor(values4, errors) {
     super();
-    this.values = values3;
+    this.values = values4;
     this.errors = errors;
   }
 };
 var InvalidForm = class extends CustomType {
-  constructor(values3, errors) {
+  constructor(values4, errors) {
     super();
-    this.values = values3;
+    this.values = values4;
     this.errors = errors;
   }
 };
 var ValidForm = class extends CustomType {
-  constructor(values3, output) {
+  constructor(values4, output) {
     super();
-    this.values = values3;
+    this.values = values4;
     this.output = output;
   }
 };
@@ -1851,20 +1887,20 @@ function decoding(constructor) {
 function parameter(f) {
   return f;
 }
-function with_values_dict(form2, values3) {
+function with_values_dict(form2, values4) {
   if (form2 instanceof InvalidForm) {
     let errors = form2.errors;
-    return new InvalidForm(values3, errors);
+    return new InvalidForm(values4, errors);
   } else {
     let output = form2.output;
-    return new ValidForm(values3, output);
+    return new ValidForm(values4, output);
   }
 }
 function finish(form2) {
   if (form2 instanceof InvalidForm) {
-    let values3 = form2.values;
+    let values4 = form2.values;
     let errors = form2.errors;
-    return new Error(new Form(values3, errors));
+    return new Error(new Form(values4, errors));
   } else {
     let output = form2.output;
     return new Ok(output);
@@ -1885,9 +1921,9 @@ function and(previous, next) {
 function string(input2) {
   return new Ok(trim(input2));
 }
-function kw_to_dict(values3) {
+function kw_to_dict(values4) {
   return fold_right(
-    values3,
+    values4,
     new_map(),
     (acc, pair) => {
       return upsert(
@@ -1900,8 +1936,8 @@ function kw_to_dict(values3) {
     }
   );
 }
-function with_values(form2, values3) {
-  let _pipe = values3;
+function with_values(form2, values4) {
+  let _pipe = values4;
   let _pipe$1 = kw_to_dict(_pipe);
   return ((_capture) => {
     return with_values_dict(form2, _capture);
@@ -1928,11 +1964,11 @@ function must_be_string_longer_than(length5) {
 }
 function get_values(form2) {
   if (form2 instanceof InvalidForm) {
-    let values3 = form2.values;
-    return values3;
+    let values4 = form2.values;
+    return values4;
   } else {
-    let values3 = form2.values;
-    return values3;
+    let values4 = form2.values;
+    return values4;
   }
 }
 function multifield(form2, name2, decoder) {
@@ -1944,26 +1980,26 @@ function multifield(form2, name2, decoder) {
   _block = decoder(_pipe$3);
   let result = _block;
   if (form2 instanceof ValidForm) {
-    let values3 = form2.values;
+    let values4 = form2.values;
     let output = form2.output;
     if (result.isOk()) {
       let next = result[0];
-      return new ValidForm(values3, output(next));
+      return new ValidForm(values4, output(next));
     } else {
       let message$1 = result[0];
       return new InvalidForm(
-        values3,
+        values4,
         insert(new_map(), name2, message$1)
       );
     }
   } else {
-    let values3 = form2.values;
+    let values4 = form2.values;
     let errors = form2.errors;
     if (result.isOk()) {
-      return new InvalidForm(values3, errors);
+      return new InvalidForm(values4, errors);
     } else {
       let message$1 = result[0];
-      return new InvalidForm(values3, insert(errors, name2, message$1));
+      return new InvalidForm(values4, insert(errors, name2, message$1));
     }
   }
 }
@@ -2060,7 +2096,7 @@ function success(data) {
     return [data, toList([])];
   });
 }
-function map3(decoder, transformer) {
+function map4(decoder, transformer) {
   return new Decoder(
     (d) => {
       let $ = decoder.function(d);
@@ -2159,11 +2195,11 @@ function push_path(layer, path2) {
     toList([
       (() => {
         let _pipe = int2;
-        return map3(_pipe, to_string);
+        return map4(_pipe, to_string);
       })()
     ])
   );
-  let path$1 = map(
+  let path$1 = map2(
     path2,
     (key2) => {
       let key$1 = identity(key2);
@@ -2176,7 +2212,7 @@ function push_path(layer, path2) {
       }
     }
   );
-  let errors = map(
+  let errors = map2(
     layer[1],
     (error) => {
       let _record = error;
@@ -2361,7 +2397,7 @@ var UnableToDecode = class extends CustomType {
   }
 };
 function do_parse(json2, decoder) {
-  return then$(
+  return then$2(
     decode(json2),
     (dynamic_value) => {
       let _pipe = run(dynamic_value, decoder);
@@ -2671,7 +2707,7 @@ function do_comap_actions(actions, f) {
   );
 }
 function do_map(effects, f) {
-  return map(
+  return map2(
     effects,
     (effect) => {
       return (actions) => {
@@ -2680,7 +2716,7 @@ function do_map(effects, f) {
     }
   );
 }
-function map4(effect, f) {
+function map5(effect, f) {
   return new Effect(
     do_map(effect.synchronous, f),
     do_map(effect.before_paint, f),
@@ -4604,7 +4640,7 @@ function do_add_event(handlers, mapper, path2, name2, handler) {
   return insert3(
     handlers,
     event2(path2, name2),
-    map3(handler, identity3(mapper))
+    map4(handler, identity3(mapper))
   );
 }
 function add_event(events, mapper, path2, name2, handler) {
@@ -5061,14 +5097,14 @@ function formdata_decoder() {
       return field2(
         1,
         one_of(
-          map3(string3, (var0) => {
+          map4(string3, (var0) => {
             return new Ok(var0);
           }),
           toList([success(new Error(void 0))])
         ),
         (value2) => {
           let _pipe2 = value2;
-          let _pipe$12 = map2(
+          let _pipe$12 = map3(
             _pipe2,
             (_capture) => {
               return new$(key2, _capture);
@@ -5081,7 +5117,7 @@ function formdata_decoder() {
   );
   let _pipe = string_value_decoder;
   let _pipe$1 = list2(_pipe);
-  return map3(_pipe$1, values2);
+  return map4(_pipe$1, values3);
 }
 function on_submit(msg) {
   let _pipe = on(
@@ -5644,7 +5680,7 @@ function expect_json(decoder, handler) {
   return expect_json_response(
     (result) => {
       let _pipe = result;
-      let _pipe$1 = then$(
+      let _pipe$1 = then$2(
         _pipe,
         (_capture) => {
           return decode_json_body(_capture, decoder);
@@ -5990,7 +6026,7 @@ function render_radio_choice(name2, value2, checked2, label2, message) {
 }
 function render_radio_fieldset(config) {
   let _pipe = config.choices;
-  let _pipe$1 = map(
+  let _pipe$1 = map2(
     _pipe,
     (choice) => {
       let value2 = choice[0];
@@ -6072,7 +6108,7 @@ function render_dock(buttons, active_page, message) {
   };
   return div(
     toList([class$("dock shadow-sm bg-base-200")]),
-    map(buttons, render_dock_button)
+    map2(buttons, render_dock_button)
   );
 }
 
@@ -6240,13 +6276,6 @@ var Accouchement = class extends CustomType {
     this.raison = raison;
   }
 };
-var ProfilForm = class extends CustomType {
-  constructor(sexe, semestre) {
-    super();
-    this.sexe = sexe;
-    this.semestre = semestre;
-  }
-};
 var LoginData = class extends CustomType {
   constructor(username, password) {
     super();
@@ -6397,10 +6426,16 @@ function decode_profil() {
               if (semestre$1.isOk() && sexe$1.isOk()) {
                 let semestre$2 = semestre$1[0];
                 let sexe$2 = sexe$1[0];
-                return success(new Profil(name2, sexe$2, semestre$2));
+                return success(
+                  new Profil(
+                    new Some(name2),
+                    new Some(sexe$2),
+                    new Some(semestre$2)
+                  )
+                );
               } else {
                 return failure(
-                  new Profil(name2, new Homme(), new Ps()),
+                  new Profil(new None(), new None(), new None()),
                   "Profil"
                 );
               }
@@ -6426,29 +6461,41 @@ function encode_semestre(semestre) {
     return "dj2";
   }
 }
-function encode_profil_form(profil) {
-  let _block;
-  let $ = profil.sexe;
-  if ($ instanceof Some) {
-    let sexe2 = $[0];
-    _block = encode_sexe(sexe2);
-  } else {
-    _block = "";
-  }
-  let sexe = _block;
-  let _block$1;
-  let $1 = profil.semestre;
-  if ($1 instanceof Some) {
-    let semestre2 = $1[0];
-    _block$1 = encode_semestre(semestre2);
-  } else {
-    _block$1 = "";
-  }
-  let semestre = _block$1;
-  let _pipe = object2(
-    toList([["sexe", string4(sexe)], ["semestre", string4(semestre)]])
-  );
-  return to_string2(_pipe);
+function encode_profil(profil) {
+  let _pipe = toList([
+    map(profil.name, (name2) => {
+      return ["name", string4(name2)];
+    }),
+    map(
+      profil.sexe,
+      (sexe) => {
+        return [
+          "sexe",
+          (() => {
+            let _pipe2 = sexe;
+            let _pipe$12 = encode_sexe(_pipe2);
+            return string4(_pipe$12);
+          })()
+        ];
+      }
+    ),
+    map(
+      profil.semestre,
+      (semestre) => {
+        return [
+          "semestre",
+          (() => {
+            let _pipe2 = semestre;
+            let _pipe$12 = encode_semestre(_pipe2);
+            return string4(_pipe$12);
+          })()
+        ];
+      }
+    )
+  ]);
+  let _pipe$1 = values(_pipe);
+  let _pipe$2 = object2(_pipe$1);
+  return to_string2(_pipe$2);
 }
 function page_name(page) {
   if (page instanceof ProfilPage) {
@@ -6555,7 +6602,7 @@ function update_profil(server, profil, msg) {
     server,
     "users",
     user_id,
-    encode_profil_form(profil),
+    encode_profil(profil),
     decode_profil(),
     msg
   );
@@ -6570,7 +6617,7 @@ function create_record(pb, accouchement) {
     throw makeError(
       "todo",
       "client",
-      374,
+      373,
       "create_record",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6592,7 +6639,7 @@ function update3(model, msg) {
     let login_data = msg[0][0];
     return [
       model,
-      map4(
+      map5(
         auth_with_password(
           model.pb,
           login_data.username,
@@ -6612,7 +6659,7 @@ function update3(model, msg) {
       throw makeError(
         "let_assert",
         "client",
-        267,
+        266,
         "update",
         "Pattern match failed, no pattern matched the value.",
         { value: $ }
@@ -6647,7 +6694,7 @@ function update3(model, msg) {
       throw makeError(
         "let_assert",
         "client",
-        277,
+        276,
         "update",
         "Pattern match failed, no pattern matched the value.",
         { value: $ }
@@ -6683,7 +6730,7 @@ function update3(model, msg) {
       throw makeError(
         "let_assert",
         "client",
-        283,
+        282,
         "update",
         "Pattern match failed, no pattern matched the value.",
         { value: $ }
@@ -6741,7 +6788,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      301,
+      300,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6750,7 +6797,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      302,
+      301,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6759,7 +6806,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      303,
+      302,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6768,7 +6815,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      305,
+      304,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6793,7 +6840,7 @@ function update3(model, msg) {
         let _record = model;
         return new Model(pb, _record.profil, _record.page);
       })(),
-      map4(effect, (var0) => {
+      map5(effect, (var0) => {
         return new PocketBaseMsg(var0);
       })
     ];
@@ -6829,7 +6876,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      332,
+      331,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6850,7 +6897,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      337,
+      336,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6859,7 +6906,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      338,
+      337,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6868,7 +6915,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      339,
+      338,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6877,7 +6924,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      340,
+      339,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6886,7 +6933,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      341,
+      340,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6895,7 +6942,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      342,
+      341,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6904,7 +6951,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      343,
+      342,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6913,7 +6960,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      344,
+      343,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -7190,38 +7237,38 @@ function fieldset_autonomie_raison_aide_mineure(checked2, other_is_disabled, oth
 }
 function view_profil_form(profil) {
   let handle_submit = (form_data) => {
-    let _pipe = decoding(
+    let _pipe2 = decoding(
       parameter(
         (sexe2) => {
           return parameter(
             (semestre2) => {
-              return new ProfilForm(new Some(sexe2), new Some(semestre2));
+              return new Profil(new None(), new Some(sexe2), new Some(semestre2));
             }
           );
         }
       )
     );
-    let _pipe$1 = with_values(_pipe, form_data);
-    let _pipe$2 = field(_pipe$1, "sexe", decode_sexe);
-    let _pipe$3 = field(_pipe$2, "semestre", decode_semestre);
-    let _pipe$4 = finish(_pipe$3);
-    return new UserSubmittedProfilForm(_pipe$4);
+    let _pipe$12 = with_values(_pipe2, form_data);
+    let _pipe$22 = field(_pipe$12, "sexe", decode_sexe);
+    let _pipe$32 = field(_pipe$22, "semestre", decode_semestre);
+    let _pipe$42 = finish(_pipe$32);
+    return new UserSubmittedProfilForm(_pipe$42);
   };
   let _block;
-  if (profil instanceof Some) {
-    let profil$1 = profil[0];
-    _block = encode_sexe(profil$1.sexe);
-  } else {
-    _block = "";
-  }
+  let _pipe = profil;
+  let _pipe$1 = then$(_pipe, (profil2) => {
+    return profil2.sexe;
+  });
+  let _pipe$2 = map(_pipe$1, encode_sexe);
+  _block = unwrap(_pipe$2, "");
   let sexe = _block;
   let _block$1;
-  if (profil instanceof Some) {
-    let profil$1 = profil[0];
-    _block$1 = encode_semestre(profil$1.semestre);
-  } else {
-    _block$1 = "";
-  }
+  let _pipe$3 = profil;
+  let _pipe$4 = then$(_pipe$3, (profil2) => {
+    return profil2.semestre;
+  });
+  let _pipe$5 = map(_pipe$4, encode_semestre);
+  _block$1 = unwrap(_pipe$5, "");
   let semestre = _block$1;
   return form(
     toList([on_submit(handle_submit), class$("")]),
@@ -7361,10 +7408,12 @@ function view_accueil() {
   );
 }
 function main_form(accouchement) {
-  let validate_profil_form = () => {
-    return new Ok(new ProfilForm(new Some(new Homme()), new Some(new Pa2())));
+  let validate_profil = () => {
+    return new Ok(
+      new Profil(new None(), new Some(new Homme()), new Some(new Pa2()))
+    );
   };
-  let validate_accouchement_form = () => {
+  let validate_accouchement = () => {
     return new Ok(
       new Accouchement(
         accouchement.poste_chef,
@@ -7376,11 +7425,11 @@ function main_form(accouchement) {
     );
   };
   let handle_submit = () => {
-    let accouchement_form = validate_accouchement_form();
+    let accouchement_form = validate_accouchement();
     let _block2;
     let $5 = accouchement.profil;
     if ($5 instanceof Some) {
-      let $12 = validate_profil_form();
+      let $12 = validate_profil();
       if ($12.isOk() && accouchement_form.isOk()) {
         let profil_form = $12[0];
         let accouchement$1 = accouchement_form[0];
@@ -7552,7 +7601,7 @@ function init2(_) {
       let _record = model;
       return new Model(server, _record.profil, _record.page);
     })(),
-    map4(pb_effect, (var0) => {
+    map5(pb_effect, (var0) => {
       return new PocketBaseMsg(var0);
     })
   ];

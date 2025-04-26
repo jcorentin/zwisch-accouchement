@@ -43,7 +43,7 @@ type Model {
 }
 
 type Profil {
-  Profil(name: String, sexe: Sexe, semestre: Semestre)
+  Profil(name: Option(String), sexe: Option(Sexe), semestre: Option(Semestre))
 }
 
 fn decode_profil() -> Decoder(Profil) {
@@ -53,25 +53,30 @@ fn decode_profil() -> Decoder(Profil) {
   let semestre = decode_semestre(semestre)
   let sexe = decode_sexe(sexe)
   case semestre, sexe {
-    Ok(semestre), Ok(sexe) -> decode.success(Profil(name:, semestre:, sexe:))
-    _, _ -> decode.failure(Profil(name:, semestre: Ps, sexe: Homme), "Profil")
+    Ok(semestre), Ok(sexe) ->
+      decode.success(Profil(
+        name: Some(name),
+        semestre: Some(semestre),
+        sexe: Some(sexe),
+      ))
+    _, _ ->
+      decode.failure(Profil(name: None, semestre: None, sexe: None), "Profil")
   }
 }
 
-fn encode_profil_form(profil: ProfilForm) -> String {
-  let sexe = case profil.sexe {
-    Some(sexe) -> encode_sexe(sexe)
-    None -> ""
-  }
-  let semestre = case profil.semestre {
-    Some(semestre) -> encode_semestre(semestre)
-    None -> ""
-  }
-  json.object([
-    #("sexe", json.string(sexe)),
-    #("semestre", json.string(semestre)),
-  ])
-  |> json.to_string()
+fn encode_profil(profil: Profil) -> String {
+  [
+    option.map(profil.name, fn(name) { #("name", json.string(name)) }),
+    option.map(profil.sexe, fn(sexe) {
+      #("sexe", sexe |> encode_sexe |> json.string)
+    }),
+    option.map(profil.semestre, fn(semestre) {
+      #("semestre", semestre |> encode_semestre |> json.string)
+    }),
+  ]
+  |> option.values
+  |> json.object
+  |> json.to_string
 }
 
 type Sexe {
@@ -160,7 +165,7 @@ fn encode_autonomie_raison(raison: AutonomieRaisonState) {
 
 type AccouchementFormState {
   AccouchementFormState(
-    profil: Option(ProfilForm),
+    profil: Option(Profil),
     poste_chef: String,
     moment: String,
     instrument: String,
@@ -188,10 +193,6 @@ pub type Accouchement {
     autonomie: String,
     raison: String,
   )
-}
-
-type ProfilForm {
-  ProfilForm(sexe: Option(Sexe), semestre: Option(Semestre))
 }
 
 pub fn decode_accouchement() {
@@ -232,11 +233,9 @@ type Msg {
   UserSubmittedLoginForm(Result(LoginData, form.Form))
   UserClickedDock(String)
   UserClickedLogout
-  UserSubmittedProfilForm(Result(ProfilForm, form.Form))
+  UserSubmittedProfilForm(Result(Profil, form.Form))
   ApiReturnedProfil(Result(Profil, rsvp.Error))
-  UserSubmittedAccouchementForm(
-    Result(#(Option(ProfilForm), Accouchement), Nil),
-  )
+  UserSubmittedAccouchementForm(Result(#(Option(Profil), Accouchement), Nil))
   ApiReturnedAccouchement(Result(Accouchement, rsvp.Error))
   UserChangedSexe(String)
   UserChangedSemestre(String)
@@ -353,7 +352,7 @@ fn get_profil(server: PocketBase, msg) {
   pb.get_one_record(server, "users", user_id, decode_profil(), msg)
 }
 
-fn update_profil(server: PocketBase, profil: ProfilForm, msg) {
+fn update_profil(server: PocketBase, profil: Profil, msg) {
   let user_id = case server.auth {
     Some(auth) -> auth.user_id
     None -> ""
@@ -362,7 +361,7 @@ fn update_profil(server: PocketBase, profil: ProfilForm, msg) {
     server,
     "users",
     user_id,
-    encode_profil_form(profil),
+    encode_profil(profil),
     decode_profil(),
     msg,
   )
@@ -668,7 +667,7 @@ fn view_profil_form(profil: Option(Profil)) -> Element(Msg) {
       use sexe <- form.parameter
       use semestre <- form.parameter
 
-      ProfilForm(sexe: Some(sexe), semestre: Some(semestre))
+      Profil(name: None, sexe: Some(sexe), semestre: Some(semestre))
     })
     |> form.with_values(form_data)
     |> form.field("sexe", decode_sexe)
@@ -676,14 +675,17 @@ fn view_profil_form(profil: Option(Profil)) -> Element(Msg) {
     |> form.finish
     |> UserSubmittedProfilForm()
   }
-  let sexe = case profil {
-    Some(profil) -> encode_sexe(profil.sexe)
-    None -> ""
-  }
-  let semestre = case profil {
-    Some(profil) -> encode_semestre(profil.semestre)
-    None -> ""
-  }
+  let sexe =
+    profil
+    |> option.then(fn(profil) { profil.sexe })
+    |> option.map(encode_sexe)
+    |> option.unwrap("")
+
+  let semestre =
+    profil
+    |> option.then(fn(profil) { profil.semestre })
+    |> option.map(encode_semestre)
+    |> option.unwrap("")
 
   html.form([event.on_submit(handle_submit), attribute.class("")], [
     fieldset_sexe(sexe),
@@ -762,10 +764,10 @@ fn view_accouchement(accouchement: AccouchementFormState) -> Element(Msg) {
 }
 
 fn main_form(accouchement: AccouchementFormState) -> Element(Msg) {
-  let validate_profil_form = fn() {
-    Ok(ProfilForm(sexe: Some(Homme), semestre: Some(Pa2)))
+  let validate_profil = fn() {
+    Ok(Profil(name: None, sexe: Some(Homme), semestre: Some(Pa2)))
   }
-  let validate_accouchement_form = fn() {
+  let validate_accouchement = fn() {
     Ok(Accouchement(
       poste_chef: accouchement.poste_chef,
       moment: accouchement.moment,
@@ -775,10 +777,10 @@ fn main_form(accouchement: AccouchementFormState) -> Element(Msg) {
     ))
   }
   let handle_submit = fn() -> Msg {
-    let accouchement_form = validate_accouchement_form()
+    let accouchement_form = validate_accouchement()
     case accouchement.profil {
       Some(_) -> {
-        case validate_profil_form(), accouchement_form {
+        case validate_profil(), accouchement_form {
           Ok(profil_form), Ok(accouchement) ->
             Ok(#(Some(profil_form), accouchement))
           _, _ -> Error(Nil)
