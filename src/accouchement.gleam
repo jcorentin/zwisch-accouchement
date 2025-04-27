@@ -83,7 +83,7 @@ pub fn encode(acc: Accouchement) -> String {
 
 pub fn validate(
   acc: Accouchement,
-) -> Result(Accouchement, List(#(String, String))) {
+) -> Result(Accouchement, dict.Dict(String, String)) {
   let validate_fields =
     [
       #("poste_chef", acc.poste_chef),
@@ -111,6 +111,6 @@ pub fn validate(
     })
   case list.is_empty(errors) {
     True -> Ok(acc)
-    False -> Error(errors)
+    False -> Error(dict.from_list(errors))
   }
 }
