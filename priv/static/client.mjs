@@ -373,6 +373,14 @@ var Some = class extends CustomType {
 };
 var None = class extends CustomType {
 };
+function to_result(option, e) {
+  if (option instanceof Some) {
+    let a = option[0];
+    return new Ok(a);
+  } else {
+    return new Error(e);
+  }
+}
 function unwrap(option, default$) {
   if (option instanceof Some) {
     let x = option[0];
@@ -385,14 +393,6 @@ function map(option, fun) {
   if (option instanceof Some) {
     let x = option[0];
     return new Some(fun(x));
-  } else {
-    return new None();
-  }
-}
-function then$(option, fun) {
-  if (option instanceof Some) {
-    let x = option[0];
-    return fun(x);
   } else {
     return new None();
   }
@@ -452,6 +452,25 @@ function reverse_and_prepend(loop$prefix, loop$suffix) {
 }
 function reverse(list4) {
   return reverse_and_prepend(list4, toList([]));
+}
+function is_empty(list4) {
+  return isEqual(list4, toList([]));
+}
+function contains(loop$list, loop$elem) {
+  while (true) {
+    let list4 = loop$list;
+    let elem = loop$elem;
+    if (list4.hasLength(0)) {
+      return false;
+    } else if (list4.atLeastLength(1) && isEqual(list4.head, elem)) {
+      let first$1 = list4.head;
+      return true;
+    } else {
+      let rest$1 = list4.tail;
+      loop$list = rest$1;
+      loop$elem = elem;
+    }
+  }
 }
 function first(list4) {
   if (list4.hasLength(0)) {
@@ -971,6 +990,13 @@ function trim(string6) {
   let _pipe$1 = trim_start(_pipe);
   return trim_end(_pipe$1);
 }
+function to_option(string6) {
+  if (string6 === "") {
+    return new None();
+  } else {
+    return new Some(string6);
+  }
+}
 
 // build/dev/javascript/gleam_stdlib/gleam/result.mjs
 function is_ok(result) {
@@ -1007,7 +1033,7 @@ function try$(result, fun) {
     return new Error(e);
   }
 }
-function then$2(result, fun) {
+function then$(result, fun) {
   return try$(result, fun);
 }
 function unwrap2(result, default$) {
@@ -2039,14 +2065,14 @@ function index2(data, key2) {
   }
   return new Error(key_is_int ? "Indexable" : "Dict");
 }
-function list(data, decode2, pushPath, index5, emptyList) {
+function list(data, decode3, pushPath, index5, emptyList) {
   if (!(data instanceof List || Array.isArray(data))) {
     const error = new DecodeError2("List", classify_dynamic(data), emptyList);
     return [emptyList, List.fromArray([error])];
   }
   const decoded = [];
   for (const element3 of data) {
-    const layer = decode2(element3);
+    const layer = decode3(element3);
     const [out, errors] = layer;
     if (errors instanceof NonEmpty) {
       const [_, errors2] = pushPath(layer, index5.toString());
@@ -2143,11 +2169,6 @@ function one_of(first2, alternatives) {
     }
   );
 }
-function decode_error(expected, found) {
-  return toList([
-    new DecodeError2(expected, classify_dynamic(found), toList([]))
-  ]);
-}
 function run_dynamic_function(data, name2, f) {
   let $ = f(data);
   if ($.isOk()) {
@@ -2163,11 +2184,6 @@ function run_dynamic_function(data, name2, f) {
 }
 function decode_int2(data) {
   return run_dynamic_function(data, "Int", int);
-}
-function failure(zero, expected) {
-  return new Decoder((d) => {
-    return [zero, decode_error(expected, d)];
-  });
 }
 var int2 = /* @__PURE__ */ new Decoder(decode_int2);
 function decode_string2(data) {
@@ -2397,7 +2413,7 @@ var UnableToDecode = class extends CustomType {
   }
 };
 function do_parse(json2, decoder) {
-  return then$2(
+  return then$(
     decode(json2),
     (dynamic_value) => {
       let _pipe = run(dynamic_value, decoder);
@@ -2450,7 +2466,7 @@ var Set2 = class extends CustomType {
 function new$2() {
   return new Set2(new_map());
 }
-function contains(set, member) {
+function contains2(set, member) {
   let _pipe = set.dict;
   let _pipe$1 = map_get(_pipe, member);
   return is_ok(_pipe$1);
@@ -3512,7 +3528,7 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
       let prev = old.head;
       let old$1 = old.tail;
       let _block;
-      let $ = prev.key === "" || !contains(moved, prev.key);
+      let $ = prev.key === "" || !contains2(moved, prev.key);
       if ($) {
         _block = removed + advance(prev);
       } else {
@@ -3555,7 +3571,7 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
       let new_remaining = new$10.tail;
       let next_did_exist = get(old_keyed, next.key);
       let prev_does_exist = get(new_keyed, prev.key);
-      let prev_has_moved = contains(moved, prev.key);
+      let prev_has_moved = contains2(moved, prev.key);
       if (prev_does_exist.isOk() && next_did_exist.isOk() && prev_has_moved) {
         loop$old = old_remaining;
         loop$old_keyed = old_keyed;
@@ -4336,9 +4352,9 @@ var ATTRIBUTE_HOOKS = {
 var virtualise = (root3) => {
   const vdom = virtualise_node(root3);
   if (vdom === null || vdom.children instanceof Empty) {
-    const empty3 = empty_text_node();
-    initialiseMetadata(empty3);
-    root3.appendChild(empty3);
+    const empty4 = empty_text_node();
+    initialiseMetadata(empty4);
+    root3.appendChild(empty4);
     return none3();
   } else if (vdom.children instanceof NonEmpty && vdom.children.tail instanceof Empty) {
     return vdom.children.head;
@@ -5680,7 +5696,7 @@ function expect_json(decoder, handler) {
   return expect_json_response(
     (result) => {
       let _pipe = result;
-      let _pipe$1 = then$2(
+      let _pipe$1 = then$(
         _pipe,
         (_capture) => {
           return decode_json_body(_capture, decoder);
@@ -5971,6 +5987,203 @@ function auth_with_password(pb, identity4, password) {
   return send4(pb, options, decode_auth(), handler);
 }
 
+// build/dev/javascript/client/accouchement.mjs
+var RaisonProposee = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var RaisonLibre = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var RaisonNone = class extends CustomType {
+};
+var Accouchement = class extends CustomType {
+  constructor(user, poste_chef2, moment2, instrument2, autonomie2, raison) {
+    super();
+    this.user = user;
+    this.poste_chef = poste_chef2;
+    this.moment = moment2;
+    this.instrument = instrument2;
+    this.autonomie = autonomie2;
+    this.raison = raison;
+  }
+};
+function encode_raison(raison) {
+  if (raison instanceof RaisonProposee) {
+    let choice = raison[0];
+    return choice;
+  } else if (raison instanceof RaisonLibre) {
+    let choice = raison[0];
+    return choice;
+  } else {
+    return "";
+  }
+}
+function empty3(user_id) {
+  return new Accouchement(
+    user_id,
+    new None(),
+    new None(),
+    new None(),
+    new None(),
+    new RaisonNone()
+  );
+}
+function decode2() {
+  return field2(
+    "user",
+    string3,
+    (user) => {
+      return field2(
+        "poste_chef",
+        string3,
+        (poste_chef2) => {
+          return field2(
+            "moment",
+            string3,
+            (moment2) => {
+              return field2(
+                "instrument",
+                string3,
+                (instrument2) => {
+                  return field2(
+                    "autonomie",
+                    string3,
+                    (autonomie2) => {
+                      return field2(
+                        "autonomie_raison",
+                        string3,
+                        (raison) => {
+                          let raisons_proposees = toList([
+                            "geste_difficile",
+                            "situation_urgence",
+                            "manque_confiance",
+                            "changement_instrument",
+                            "cas_particulier",
+                            "guidance_technique",
+                            "manque_experience",
+                            "changement_instrument",
+                            "execution_rapide",
+                            "niveau_interne",
+                            "environnement_favorable",
+                            "gestes_interne"
+                          ]);
+                          let is_raison_proposee = contains(
+                            raisons_proposees,
+                            raison
+                          );
+                          let _block;
+                          if (raison === "") {
+                            _block = new RaisonNone();
+                          } else if (is_raison_proposee) {
+                            let raison$12 = raison;
+                            _block = new RaisonProposee(raison$12);
+                          } else {
+                            let raison$12 = raison;
+                            _block = new RaisonLibre(raison$12);
+                          }
+                          let raison$1 = _block;
+                          return success(
+                            new Accouchement(
+                              user,
+                              to_option(poste_chef2),
+                              to_option(moment2),
+                              to_option(instrument2),
+                              to_option(autonomie2),
+                              raison$1
+                            )
+                          );
+                        }
+                      );
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+}
+function encode(acc) {
+  let to_string6 = (opt) => {
+    let _pipe2 = unwrap(opt, "");
+    return string4(_pipe2);
+  };
+  let _pipe = object2(
+    toList([
+      ["user", string4(acc.user)],
+      ["poste_chef", to_string6(acc.poste_chef)],
+      ["moment", to_string6(acc.moment)],
+      ["instrument", to_string6(acc.instrument)],
+      ["autonomie", to_string6(acc.autonomie)],
+      [
+        "autonomie_raison",
+        (() => {
+          let _pipe2 = acc.raison;
+          let _pipe$1 = encode_raison(_pipe2);
+          return string4(_pipe$1);
+        })()
+      ]
+    ])
+  );
+  return to_string2(_pipe);
+}
+function validate(acc) {
+  let _block;
+  let _pipe = toList([
+    ["poste_chef", acc.poste_chef],
+    ["moment", acc.moment],
+    ["instrument", acc.instrument],
+    ["autonomie", acc.autonomie]
+  ]);
+  _block = map2(
+    _pipe,
+    (item) => {
+      let name2 = item[0];
+      let value2 = item[1];
+      return to_result(value2, [name2, "empty_error"]);
+    }
+  );
+  let validate_fields = _block;
+  let _block$1;
+  let $ = acc.raison;
+  if ($ instanceof RaisonNone) {
+    _block$1 = new Error(["autonomie_raison", "empty_error"]);
+  } else if ($ instanceof RaisonLibre && $[0] === "") {
+    _block$1 = new Error(["autonomie_raison", "empty_other_error"]);
+  } else {
+    _block$1 = new Ok("");
+  }
+  let validate_raison = _block$1;
+  let _block$2;
+  let _pipe$1 = prepend(validate_raison, validate_fields);
+  _block$2 = filter_map(
+    _pipe$1,
+    (item) => {
+      if (!item.isOk()) {
+        let err = item[0];
+        return new Ok(err);
+      } else {
+        return new Error(void 0);
+      }
+    }
+  );
+  let errors = _block$2;
+  let $1 = is_empty(errors);
+  if ($1) {
+    return new Ok(acc);
+  } else {
+    return new Error(errors);
+  }
+}
+
 // build/dev/javascript/client/components.mjs
 var RadioFieldSet = class extends CustomType {
   constructor(name2, legend2, choices, checked2, on_change2) {
@@ -6112,6 +6325,248 @@ function render_dock(buttons, active_page, message) {
   );
 }
 
+// build/dev/javascript/client/fieldsets.mjs
+var RaisonFieldSetParams = class extends CustomType {
+  constructor(radio_checked, on_radio_change, input_is_disabled, input_value, on_input_change) {
+    super();
+    this.radio_checked = radio_checked;
+    this.on_radio_change = on_radio_change;
+    this.input_is_disabled = input_is_disabled;
+    this.input_value = input_value;
+    this.on_input_change = on_input_change;
+  }
+};
+function sexe(checked2, on_change2) {
+  let _pipe = new RadioFieldSet(
+    "sexe",
+    "\xCAtes-vous \u2026 ?",
+    toList([
+      ["femme", text3("Une femme")],
+      ["homme", text3("Un homme")]
+    ]),
+    checked2,
+    on_change2
+  );
+  return render_radio_fieldset(_pipe);
+}
+function semestre(checked2, on_change2) {
+  let _pipe = new RadioFieldSet(
+    "semestre",
+    "En quel semestre \xEAtes-vous ?",
+    toList([
+      ["ps", text3("Phase socle")],
+      ["pa2", text3("Phase d\u2019approfondissement : 2\xE8me ann\xE9e")],
+      ["pa3", text3("Phase d\u2019approfondissement : 3\xE8me ann\xE9e")],
+      ["pa4", text3("Phase d\u2019approfondissement : 4\xE8me ann\xE9e")],
+      ["dj1", text3("Docteur junior : 1\xE8re ann\xE9e")],
+      ["dj2", text3("Docteur junior : 2\xE8me ann\xE9e")]
+    ]),
+    checked2,
+    on_change2
+  );
+  return render_radio_fieldset(_pipe);
+}
+function poste_chef(checked2, on_change2) {
+  let _pipe = new RadioFieldSet(
+    "poste_chef",
+    "Quel poste occupe le chef ?",
+    toList([
+      ["ph", text3("Practicien Hospitalier")],
+      ["assistant", text3("Assistant")],
+      ["dj", text3("Docteur Junior")]
+    ]),
+    checked2,
+    on_change2
+  );
+  return render_radio_fieldset(_pipe);
+}
+function moment(checked2, on_change2) {
+  let _pipe = new RadioFieldSet(
+    "moment",
+    "A quel moment de la journ\xE9e a eu lieu l\u2019accouchement ?",
+    toList([
+      ["journee_semaine", text3("Jour de semaine, 8h-18h")],
+      ["journee_weekend", text3("Jour de week-end, 8h-18h")],
+      ["debut_nuit", text3("18h-minuit")],
+      ["fin_nuit", text3("minuit-8h")]
+    ]),
+    checked2,
+    on_change2
+  );
+  return render_radio_fieldset(_pipe);
+}
+function instrument(checked2, on_change2) {
+  let _pipe = new RadioFieldSet(
+    "instrument",
+    "Quel instrument a permis l\u2019accouchement ?",
+    toList([
+      ["ventouse", text3("Ventouse")],
+      ["forceps", text3("Forceps")],
+      ["spatule", text3("Spatule")]
+    ]),
+    checked2,
+    on_change2
+  );
+  return render_radio_fieldset(_pipe);
+}
+function autonomie(checked2, on_change2) {
+  let _pipe = new RadioFieldSet(
+    "autonomie",
+    "Avec quel niveau d\u2019autonomie l\u2019interne a-t-il/elle r\xE9alis\xE9 l\u2019accouchement ?",
+    toList([
+      [
+        "observe",
+        text3(
+          "Il/elle a uniquement observ\xE9 \u2013 Le chef a r\xE9alis\xE9 le geste pendant que l\u2019interne observait"
+        )
+      ],
+      [
+        "aide_active",
+        text3(
+          "Il/elle a particip\xE9 avec une aide active \u2013 L\u2019interne fait avec le chef (n\xE9cessit\xE9 d\u2019une grande d\u2019aide)"
+        )
+      ],
+      [
+        "aide_mineure",
+        text3(
+          "Il/elle a eu une aide mineure  - le chef aide l\u2019interne avec un minimum d\u2019intervention n\xE9cessaire"
+        )
+      ],
+      [
+        "sans_aide",
+        text3(
+          "Il/elle a pratiqu\xE9 en autonomie \u2013 L\u2019interne a r\xE9alis\xE9 le geste seul(e), sous observation passive du chef"
+        )
+      ]
+    ]),
+    checked2,
+    on_change2
+  );
+  return render_radio_fieldset(_pipe);
+}
+function base_autonomie_raison(params) {
+  return new RadioFieldSet(
+    "",
+    "",
+    toList([
+      [
+        "autre",
+        render_autre_input_field(
+          params.input_is_disabled,
+          params.input_value,
+          params.on_input_change
+        )
+      ]
+    ]),
+    params.radio_checked,
+    params.on_radio_change
+  );
+}
+function raison_observe(params) {
+  let base = base_autonomie_raison(params);
+  let _block;
+  let _record = base;
+  _block = new RadioFieldSet(
+    "autonomie_raison",
+    "Quelle est la principale raison pour laquelle l\u2019interne n\u2019a pas pu r\xE9alis\xE9 le geste ?",
+    append(
+      toList([
+        ["geste_difficile", text3("Le geste \xE9tait difficile")],
+        [
+          "situation_urgence",
+          text3("Nous \xE9tions dans une situation d\u2019urgence")
+        ],
+        ["manque_confiance", text3("Manque de confiance envers l\u2019interne")],
+        ["changement_instrument", text3("Changement d\u2019instrument")],
+        [
+          "cas_particulier",
+          text3("Cas particulier : Patiente suivie par le chef / V.I.P")
+        ]
+      ]),
+      base.choices
+    ),
+    _record.checked,
+    _record.on_change
+  );
+  let _pipe = _block;
+  return render_radio_fieldset(_pipe);
+}
+function raison_aide_active(params) {
+  let base = base_autonomie_raison(params);
+  let _block;
+  let _record = base;
+  _block = new RadioFieldSet(
+    "autonomie_raison",
+    "Pourquoi avez-vous estim\xE9 n\xE9cessaire d\u2019aider activement l\u2019interne ?",
+    append(
+      toList([
+        [
+          "guidance_technique",
+          text3("Le geste n\xE9cessitait une guidance technique")
+        ],
+        [
+          "manque_experience",
+          text3("L\u2019interne manquait d\u2019exp\xE9rience sur ce geste")
+        ],
+        ["changement_instrument", text3("Changement d\u2019instrument")],
+        [
+          "execution_rapide",
+          text3("La situation n\xE9cessitait une ex\xE9cution rapide")
+        ],
+        [
+          "autre",
+          render_autre_input_field(
+            params.input_is_disabled,
+            params.input_value,
+            params.on_input_change
+          )
+        ]
+      ]),
+      base.choices
+    ),
+    _record.checked,
+    _record.on_change
+  );
+  let _pipe = _block;
+  return render_radio_fieldset(_pipe);
+}
+function raison_aide_mineure(params) {
+  let base = base_autonomie_raison(params);
+  let _block;
+  let _record = base;
+  _block = new RadioFieldSet(
+    "autonomie_raison",
+    "Pourquoi avez-vous choisi de laisser l\u2019interne avec une aide mineure ?",
+    append(
+      toList([
+        [
+          "niveau_interne",
+          text3(
+            "Niveau de l\u2019interne compatible avec le fait de laisser faire"
+          )
+        ],
+        [
+          "environnement_favorable",
+          text3(
+            "L\u2019environnement \xE9tait favorable \xE0 l\u2019apprentissage (temps / contexte)"
+          )
+        ],
+        [
+          "gestes_interne",
+          text3(
+            "Gestes de l\u2019interne compatible avec une aide \xE0 minima jusqu\u2019\xE0 la fin"
+          )
+        ]
+      ]),
+      base.choices
+    ),
+    _record.checked,
+    _record.on_change
+  );
+  let _pipe = _block;
+  return render_radio_fieldset(_pipe);
+}
+
 // build/dev/javascript/lustre/lustre/element/svg.mjs
 var namespace = "http://www.w3.org/2000/svg";
 function g(attrs, children) {
@@ -6208,28 +6663,12 @@ var Model = class extends CustomType {
   }
 };
 var Profil = class extends CustomType {
-  constructor(name2, sexe, semestre) {
+  constructor(name2, sexe2, semestre2) {
     super();
     this.name = name2;
-    this.sexe = sexe;
-    this.semestre = semestre;
+    this.sexe = sexe2;
+    this.semestre = semestre2;
   }
-};
-var Femme = class extends CustomType {
-};
-var Homme = class extends CustomType {
-};
-var Ps = class extends CustomType {
-};
-var Pa2 = class extends CustomType {
-};
-var Pa3 = class extends CustomType {
-};
-var Pa4 = class extends CustomType {
-};
-var Dj1 = class extends CustomType {
-};
-var Dj2 = class extends CustomType {
 };
 var AccueilPage = class extends CustomType {
 };
@@ -6242,39 +6681,6 @@ var AccouchementPage = class extends CustomType {
   }
 };
 var ProfilPage = class extends CustomType {
-};
-var Proposed = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var Other = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var AccouchementFormState = class extends CustomType {
-  constructor(profil, poste_chef, moment, instrument, autonomie, raison) {
-    super();
-    this.profil = profil;
-    this.poste_chef = poste_chef;
-    this.moment = moment;
-    this.instrument = instrument;
-    this.autonomie = autonomie;
-    this.raison = raison;
-  }
-};
-var Accouchement = class extends CustomType {
-  constructor(poste_chef, moment, instrument, autonomie, raison) {
-    super();
-    this.poste_chef = poste_chef;
-    this.moment = moment;
-    this.instrument = instrument;
-    this.autonomie = autonomie;
-    this.raison = raison;
-  }
 };
 var LoginData = class extends CustomType {
   constructor(username, password) {
@@ -6303,7 +6709,7 @@ var UserClickedDock = class extends CustomType {
 };
 var UserClickedLogout = class extends CustomType {
 };
-var UserSubmittedProfilForm = class extends CustomType {
+var UserSubmittedProfil = class extends CustomType {
   constructor(x0) {
     super();
     this[0] = x0;
@@ -6315,7 +6721,7 @@ var ApiReturnedProfil = class extends CustomType {
     this[0] = x0;
   }
 };
-var UserSubmittedAccouchementForm = class extends CustomType {
+var UserSubmittedAccouchement = class extends CustomType {
   constructor(x0) {
     super();
     this[0] = x0;
@@ -6375,38 +6781,8 @@ var UserChangedRaisonAutre = class extends CustomType {
     this[0] = x0;
   }
 };
-function decode_sexe(sexe) {
-  if (sexe === "homme") {
-    return new Ok(new Homme());
-  } else if (sexe === "femme") {
-    return new Ok(new Femme());
-  } else {
-    return new Error("Failed to parse sexe");
-  }
-}
-function encode_sexe(sexe) {
-  if (sexe instanceof Femme) {
-    return "femme";
-  } else {
-    return "homme";
-  }
-}
-function decode_semestre(semestre) {
-  if (semestre === "ps") {
-    return new Ok(new Ps());
-  } else if (semestre === "pa2") {
-    return new Ok(new Pa2());
-  } else if (semestre === "pa3") {
-    return new Ok(new Pa3());
-  } else if (semestre === "pa4") {
-    return new Ok(new Pa4());
-  } else if (semestre === "dj1") {
-    return new Ok(new Dj1());
-  } else if (semestre === "dj2") {
-    return new Ok(new Dj2());
-  } else {
-    return new Error("Failed to parse semestre");
-  }
+function empty_profil() {
+  return new Profil(new None(), new None(), new None());
 }
 function decode_profil() {
   return field2(
@@ -6416,29 +6792,18 @@ function decode_profil() {
       return field2(
         "semestre",
         string3,
-        (semestre) => {
+        (semestre2) => {
           return field2(
             "sexe",
             string3,
-            (sexe) => {
-              let semestre$1 = decode_semestre(semestre);
-              let sexe$1 = decode_sexe(sexe);
-              if (semestre$1.isOk() && sexe$1.isOk()) {
-                let semestre$2 = semestre$1[0];
-                let sexe$2 = sexe$1[0];
-                return success(
-                  new Profil(
-                    new Some(name2),
-                    new Some(sexe$2),
-                    new Some(semestre$2)
-                  )
-                );
-              } else {
-                return failure(
-                  new Profil(new None(), new None(), new None()),
-                  "Profil"
-                );
-              }
+            (sexe2) => {
+              return success(
+                new Profil(
+                  to_option(name2),
+                  to_option(sexe2),
+                  to_option(semestre2)
+                )
+              );
             }
           );
         }
@@ -6446,56 +6811,28 @@ function decode_profil() {
     }
   );
 }
-function encode_semestre(semestre) {
-  if (semestre instanceof Ps) {
-    return "ps";
-  } else if (semestre instanceof Pa2) {
-    return "pa2";
-  } else if (semestre instanceof Pa3) {
-    return "pa3";
-  } else if (semestre instanceof Pa4) {
-    return "pa4";
-  } else if (semestre instanceof Dj1) {
-    return "dj1";
-  } else {
-    return "dj2";
-  }
-}
 function encode_profil(profil) {
   let _pipe = toList([
-    map(profil.name, (name2) => {
-      return ["name", string4(name2)];
-    }),
-    map(
-      profil.sexe,
-      (sexe) => {
-        return [
-          "sexe",
-          (() => {
-            let _pipe2 = sexe;
-            let _pipe$12 = encode_sexe(_pipe2);
-            return string4(_pipe$12);
-          })()
-        ];
-      }
-    ),
-    map(
-      profil.semestre,
-      (semestre) => {
-        return [
-          "semestre",
-          (() => {
-            let _pipe2 = semestre;
-            let _pipe$12 = encode_semestre(_pipe2);
-            return string4(_pipe$12);
-          })()
-        ];
-      }
-    )
+    ["name", profil.name],
+    ["sexe", profil.sexe],
+    ["semestre", profil.semestre]
   ]);
-  let _pipe$1 = values(_pipe);
-  let _pipe$2 = object2(_pipe$1);
-  return to_string2(_pipe$2);
+  let _pipe$1 = map2(
+    _pipe,
+    (item) => {
+      let key2 = item[0];
+      let value2 = item[1];
+      return map(
+        value2,
+        (value3) => {
+          return [key2, string4(value3)];
+        }
+      );
+    }
+  );
+  let _pipe$2 = values(_pipe$1);
+  let _pipe$3 = object2(_pipe$2);
+  return to_string2(_pipe$3);
 }
 function page_name(page) {
   if (page instanceof ProfilPage) {
@@ -6507,74 +6844,6 @@ function page_name(page) {
   } else {
     return "Login";
   }
-}
-function encode_autonomie_raison(raison) {
-  if (raison instanceof Some && raison[0] instanceof Proposed) {
-    let choice = raison[0][0];
-    return choice;
-  } else if (raison instanceof Some && raison[0] instanceof Other) {
-    let choice = raison[0][0];
-    return choice;
-  } else {
-    return "";
-  }
-}
-function empty_form_state() {
-  return new AccouchementFormState(new None(), "", "", "", "", new None());
-}
-function decode_accouchement() {
-  return field2(
-    "poste_chef",
-    string3,
-    (poste_chef) => {
-      return field2(
-        "moment",
-        string3,
-        (moment) => {
-          return field2(
-            "instrument",
-            string3,
-            (instrument) => {
-              return field2(
-                "autonomie",
-                string3,
-                (autonomie) => {
-                  return field2(
-                    "autonomie_raison",
-                    string3,
-                    (autonomie_raison) => {
-                      return success(
-                        new Accouchement(
-                          poste_chef,
-                          moment,
-                          instrument,
-                          autonomie,
-                          autonomie_raison
-                        )
-                      );
-                    }
-                  );
-                }
-              );
-            }
-          );
-        }
-      );
-    }
-  );
-}
-function encode_accouchement(user_id, accouchement) {
-  let _pipe = object2(
-    toList([
-      ["user", string4(user_id)],
-      ["poste_chef", string4(accouchement.poste_chef)],
-      ["moment", string4(accouchement.moment)],
-      ["instrument", string4(accouchement.instrument)],
-      ["autonomie", string4(accouchement.autonomie)],
-      ["autonomie_raison", string4(accouchement.raison)]
-    ])
-  );
-  return to_string2(_pipe);
 }
 function get_profil(server, msg) {
   let _block;
@@ -6588,7 +6857,7 @@ function get_profil(server, msg) {
   let user_id = _block;
   return get_one_record(server, "users", user_id, decode_profil(), msg);
 }
-function update_profil(server, profil, msg) {
+function submit_profil(server, profil, msg) {
   let _block;
   let $ = server.auth;
   if ($ instanceof Some) {
@@ -6607,28 +6876,12 @@ function update_profil(server, profil, msg) {
     msg
   );
 }
-function create_record(pb, accouchement) {
-  let _block;
-  let $ = pb.auth;
-  if ($ instanceof Some) {
-    let auth = $[0];
-    _block = auth.user_id;
-  } else {
-    throw makeError(
-      "todo",
-      "client",
-      373,
-      "create_record",
-      "`todo` expression evaluated. This code has not yet been implemented.",
-      {}
-    );
-  }
-  let user_id = _block;
+function submit_accouchement(pb, acc) {
   return create_one_record(
     pb,
     "accouchements",
-    encode_accouchement(user_id, accouchement),
-    decode_accouchement(),
+    encode(acc),
+    decode2(),
     (var0) => {
       return new ApiReturnedAccouchement(var0);
     }
@@ -6659,31 +6912,32 @@ function update3(model, msg) {
       throw makeError(
         "let_assert",
         "client",
-        266,
+        143,
         "update",
         "Pattern match failed, no pattern matched the value.",
         { value: $ }
       );
     }
-    let form_state = $[0];
+    let profil = $[0][0];
+    let acc = $[0][1];
     let _block;
-    let _record = form_state;
-    _block = new AccouchementFormState(
-      _record.profil,
+    let _record = acc;
+    _block = new Accouchement(
+      _record.user,
       _record.poste_chef,
       _record.moment,
       _record.instrument,
-      new_autonomie,
-      new None()
+      new Some(new_autonomie),
+      new RaisonNone()
     );
-    let new_accouchement = _block;
+    let new_acc = _block;
     return [
       (() => {
         let _record$1 = model;
         return new Model(
           _record$1.pb,
           _record$1.profil,
-          new AccouchementPage(new_accouchement)
+          new AccouchementPage([profil, new_acc])
         );
       })(),
       none2()
@@ -6694,31 +6948,32 @@ function update3(model, msg) {
       throw makeError(
         "let_assert",
         "client",
-        276,
+        156,
         "update",
         "Pattern match failed, no pattern matched the value.",
         { value: $ }
       );
     }
-    let form_state = $[0];
+    let profil = $[0][0];
+    let acc = $[0][1];
     let _block;
-    let _record = form_state;
-    _block = new AccouchementFormState(
-      _record.profil,
+    let _record = acc;
+    _block = new Accouchement(
+      _record.user,
       _record.poste_chef,
       _record.moment,
       _record.instrument,
       _record.autonomie,
-      new Some(new Other(""))
+      new RaisonLibre("")
     );
-    let new_accouchement = _block;
+    let new_acc = _block;
     return [
       (() => {
         let _record$1 = model;
         return new Model(
           _record$1.pb,
           _record$1.profil,
-          new AccouchementPage(new_accouchement)
+          new AccouchementPage([profil, new_acc])
         );
       })(),
       none2()
@@ -6730,36 +6985,37 @@ function update3(model, msg) {
       throw makeError(
         "let_assert",
         "client",
-        282,
+        164,
         "update",
         "Pattern match failed, no pattern matched the value.",
         { value: $ }
       );
     }
-    let form_state = $[0];
+    let profil = $[0][0];
+    let acc = $[0][1];
     let _block;
-    let _record = form_state;
-    _block = new AccouchementFormState(
-      _record.profil,
+    let _record = acc;
+    _block = new Accouchement(
+      _record.user,
       _record.poste_chef,
       _record.moment,
       _record.instrument,
       _record.autonomie,
-      new Some(new Proposed(raison))
+      new RaisonProposee(raison)
     );
-    let new_accouchement = _block;
+    let new_acc = _block;
     return [
       (() => {
         let _record$1 = model;
         return new Model(
           _record$1.pb,
           _record$1.profil,
-          new AccouchementPage(new_accouchement)
+          new AccouchementPage([profil, new_acc])
         );
       })(),
       none2()
     ];
-  } else if (msg instanceof UserSubmittedAccouchementForm && msg[0].isOk()) {
+  } else if (msg instanceof UserSubmittedAccouchement && msg[0].isOk()) {
     let new_profil = msg[0][0][0];
     let new_accouchement = msg[0][0][1];
     return [
@@ -6769,26 +7025,26 @@ function update3(model, msg) {
           let new_profil$1 = new_profil[0];
           return batch(
             toList([
-              update_profil(
+              submit_profil(
                 model.pb,
                 new_profil$1,
                 (var0) => {
                   return new ApiReturnedProfil(var0);
                 }
               ),
-              create_record(model.pb, new_accouchement)
+              submit_accouchement(model.pb, new_accouchement)
             ])
           );
         } else {
-          return create_record(model.pb, new_accouchement);
+          return submit_accouchement(model.pb, new_accouchement);
         }
       })()
     ];
-  } else if (msg instanceof UserSubmittedAccouchementForm && !msg[0].isOk()) {
+  } else if (msg instanceof UserSubmittedAccouchement && !msg[0].isOk()) {
     throw makeError(
       "todo",
       "client",
-      300,
+      184,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6797,7 +7053,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      301,
+      185,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6806,7 +7062,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      302,
+      186,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6815,7 +7071,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      304,
+      188,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6847,9 +7103,37 @@ function update3(model, msg) {
   } else if (msg instanceof UserClickedDock) {
     let location = msg[0];
     let _block;
-    let $ = model.page;
     if (location === "Accouchement") {
-      _block = new AccouchementPage(empty_form_state());
+      let _block$12;
+      let $ = model.pb.auth;
+      if ($ instanceof Some) {
+        let auth = $[0];
+        _block$12 = auth.user_id;
+      } else {
+        throw makeError(
+          "todo",
+          "client",
+          207,
+          "update",
+          "`todo` expression evaluated. This code has not yet been implemented.",
+          {}
+        );
+      }
+      let user_id = _block$12;
+      let _block$2;
+      let $1 = model.profil.sexe;
+      let $2 = model.profil.semestre;
+      if ($1 instanceof Some && $2 instanceof Some) {
+        let sexe2 = $1[0];
+        let semestre2 = $2[0];
+        _block$2 = new None();
+      } else {
+        let sexe2 = $1;
+        let semestre2 = $2;
+        _block$2 = new Some(new Profil(new None(), sexe2, semestre2));
+      }
+      let profil = _block$2;
+      _block = new AccouchementPage([profil, empty3(user_id)]);
     } else if (location === "Profil") {
       _block = new ProfilPage();
     } else if (location === "Accueil") {
@@ -6868,7 +7152,7 @@ function update3(model, msg) {
     return [
       (() => {
         let _record = model;
-        return new Model(_record.pb, new Some(new_profil), _record.page);
+        return new Model(_record.pb, new_profil, _record.page);
       })(),
       none2()
     ];
@@ -6876,16 +7160,16 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      331,
+      225,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
     );
-  } else if (msg instanceof UserSubmittedProfilForm && msg[0].isOk()) {
+  } else if (msg instanceof UserSubmittedProfil && msg[0].isOk()) {
     let profil = msg[0][0];
     return [
       model,
-      update_profil(
+      submit_profil(
         model.pb,
         profil,
         (var0) => {
@@ -6893,11 +7177,11 @@ function update3(model, msg) {
         }
       )
     ];
-  } else if (msg instanceof UserSubmittedProfilForm && !msg[0].isOk()) {
+  } else if (msg instanceof UserSubmittedProfil && !msg[0].isOk()) {
     throw makeError(
       "todo",
       "client",
-      336,
+      230,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6906,7 +7190,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      337,
+      231,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6915,7 +7199,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      338,
+      232,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6924,7 +7208,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      339,
+      233,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6933,7 +7217,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      340,
+      234,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6942,7 +7226,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      341,
+      235,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6951,7 +7235,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      342,
+      236,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -6960,7 +7244,7 @@ function update3(model, msg) {
     throw makeError(
       "todo",
       "client",
-      343,
+      237,
       "update",
       "`todo` expression evaluated. This code has not yet been implemented.",
       {}
@@ -7004,277 +7288,46 @@ function base_view(inner, page) {
     ])
   );
 }
-function fieldset_sexe(checked2) {
-  let _pipe = new RadioFieldSet(
-    "sexe",
-    "\xCAtes-vous \u2026 ?",
-    toList([
-      ["femme", text3("Une femme")],
-      ["homme", text3("Un homme")]
-    ]),
-    checked2,
-    new Some((var0) => {
-      return new UserChangedSexe(var0);
-    })
-  );
-  return render_radio_fieldset(_pipe);
-}
-function fieldset_semestre(checked2) {
-  let _pipe = new RadioFieldSet(
-    "semestre",
-    "En quel semestre \xEAtes-vous ?",
-    toList([
-      ["ps", text3("Phase socle")],
-      ["pa2", text3("Phase d\u2019approfondissement : 2\xE8me ann\xE9e")],
-      ["pa3", text3("Phase d\u2019approfondissement : 3\xE8me ann\xE9e")],
-      ["pa4", text3("Phase d\u2019approfondissement : 4\xE8me ann\xE9e")],
-      ["dj1", text3("Docteur junior : 1\xE8re ann\xE9e")],
-      ["dj2", text3("Docteur junior : 2\xE8me ann\xE9e")]
-    ]),
-    checked2,
-    new Some((var0) => {
-      return new UserChangedSemestre(var0);
-    })
-  );
-  return render_radio_fieldset(_pipe);
-}
-function fieldset_poste_chef(checked2) {
-  let _pipe = new RadioFieldSet(
-    "poste_chef",
-    "Quel poste occupe le chef ?",
-    toList([
-      ["ph", text3("Practicien Hospitalier")],
-      ["assistant", text3("Assistant")],
-      ["dj", text3("Docteur Junior")]
-    ]),
-    checked2,
-    new Some((var0) => {
-      return new UserChangedPosteChef(var0);
-    })
-  );
-  return render_radio_fieldset(_pipe);
-}
-function fieldset_moment(checked2) {
-  let _pipe = new RadioFieldSet(
-    "moment",
-    "A quel moment de la journ\xE9e a eu lieu l\u2019accouchement ?",
-    toList([
-      ["journee_semaine", text3("Jour de semaine, 8h-18h")],
-      ["journee_weekend", text3("Jour de week-end, 8h-18h")],
-      ["debut_nuit", text3("18h-minuit")],
-      ["fin_nuit", text3("minuit-8h")]
-    ]),
-    checked2,
-    new Some((var0) => {
-      return new UserChangedMoment(var0);
-    })
-  );
-  return render_radio_fieldset(_pipe);
-}
-function fieldset_instrument(checked2) {
-  let _pipe = new RadioFieldSet(
-    "instrument",
-    "Quel instrument a permis l\u2019accouchement ?",
-    toList([
-      ["ventouse", text3("Ventouse")],
-      ["forceps", text3("Forceps")],
-      ["spatule", text3("Spatule")]
-    ]),
-    checked2,
-    new Some((var0) => {
-      return new UserChangedInstrument(var0);
-    })
-  );
-  return render_radio_fieldset(_pipe);
-}
-function fieldset_autonomie(checked2) {
-  let _pipe = new RadioFieldSet(
-    "autonomie",
-    "Avec quel niveau d\u2019autonomie l\u2019interne a-t-il/elle r\xE9alis\xE9 l\u2019accouchement ?",
-    toList([
-      [
-        "observe",
-        text3(
-          "Il/elle a uniquement observ\xE9 \u2013 Le chef a r\xE9alis\xE9 le geste pendant que l\u2019interne observait"
-        )
-      ],
-      [
-        "aide_active",
-        text3(
-          "Il/elle a particip\xE9 avec une aide active \u2013 L\u2019interne fait avec le chef (n\xE9cessit\xE9 d\u2019une grande d\u2019aide)"
-        )
-      ],
-      [
-        "aide_mineure",
-        text3(
-          "Il/elle a eu une aide mineure  - le chef aide l\u2019interne avec un minimum d\u2019intervention n\xE9cessaire"
-        )
-      ],
-      [
-        "sans_aide",
-        text3(
-          "Il/elle a pratiqu\xE9 en autonomie \u2013 L\u2019interne a r\xE9alis\xE9 le geste seul(e), sous observation passive du chef"
-        )
-      ]
-    ]),
-    checked2,
-    new Some((var0) => {
-      return new UserChangedAutonomie(var0);
-    })
-  );
-  return render_radio_fieldset(_pipe);
-}
-function fieldset_autonomie_raison_observe(checked2, other_is_disabled, other_value) {
-  let _pipe = new RadioFieldSet(
-    "autonomie_raison",
-    "Quelle est la principale raison pour laquelle l\u2019interne n\u2019a pas pu r\xE9alis\xE9 le geste ?",
-    toList([
-      ["geste_difficile", text3("Le geste \xE9tait difficile")],
-      [
-        "situation_urgence",
-        text3("Nous \xE9tions dans une situation d\u2019urgence")
-      ],
-      ["manque_confiance", text3("Manque de confiance envers l\u2019interne")],
-      ["changement_instrument", text3("Changement d\u2019instrument")],
-      [
-        "cas_particulier",
-        text3("Cas particulier : Patiente suivie par le chef / V.I.P")
-      ],
-      [
-        "autre",
-        render_autre_input_field(
-          other_is_disabled,
-          other_value,
-          new Some((var0) => {
-            return new UserChangedRaisonAutre(var0);
-          })
-        )
-      ]
-    ]),
-    checked2,
-    new Some((var0) => {
-      return new UserChangedRaison(var0);
-    })
-  );
-  return render_radio_fieldset(_pipe);
-}
-function fieldset_autonomie_raison_aide_active(checked2, other_is_disabled, other_value) {
-  let _pipe = new RadioFieldSet(
-    "autonomie_raison",
-    "Pourquoi avez-vous estim\xE9 n\xE9cessaire d\u2019aider activement l\u2019interne ?",
-    toList([
-      [
-        "guidance_technique",
-        text3("Le geste n\xE9cessitait une guidance technique")
-      ],
-      [
-        "manque_exp\xE9rience",
-        text3("L\u2019interne manquait d\u2019exp\xE9rience sur ce geste")
-      ],
-      ["changement_instrument", text3("Changement d\u2019instrument")],
-      [
-        "execution_rapide",
-        text3("La situation n\xE9cessitait une ex\xE9cution rapide")
-      ],
-      [
-        "autre",
-        render_autre_input_field(
-          other_is_disabled,
-          other_value,
-          new Some((var0) => {
-            return new UserChangedRaisonAutre(var0);
-          })
-        )
-      ]
-    ]),
-    checked2,
-    new Some((var0) => {
-      return new UserChangedRaison(var0);
-    })
-  );
-  return render_radio_fieldset(_pipe);
-}
-function fieldset_autonomie_raison_aide_mineure(checked2, other_is_disabled, other_value) {
-  let _pipe = new RadioFieldSet(
-    "autonomie_raison",
-    "Pourquoi avez-vous choisi de laisser l\u2019interne avec une aide mineure ?",
-    toList([
-      [
-        "niveau_interne",
-        text3(
-          "Niveau de l\u2019interne compatible avec le fait de laisser faire"
-        )
-      ],
-      [
-        "environnement_favorable",
-        text3(
-          "L\u2019environnement \xE9tait favorable \xE0 l\u2019apprentissage (temps / contexte)"
-        )
-      ],
-      [
-        "gestes_interne",
-        text3(
-          "Gestes de l\u2019interne compatible avec une aide \xE0 minima jusqu\u2019\xE0 la fin"
-        )
-      ],
-      [
-        "autre",
-        render_autre_input_field(
-          other_is_disabled,
-          other_value,
-          new Some((var0) => {
-            return new UserChangedRaisonAutre(var0);
-          })
-        )
-      ]
-    ]),
-    checked2,
-    new Some((var0) => {
-      return new UserChangedRaison(var0);
-    })
-  );
-  return render_radio_fieldset(_pipe);
-}
 function view_profil_form(profil) {
   let handle_submit = (form_data) => {
-    let _pipe2 = decoding(
+    let _pipe = decoding(
       parameter(
-        (sexe2) => {
+        (sexe3) => {
           return parameter(
-            (semestre2) => {
-              return new Profil(new None(), new Some(sexe2), new Some(semestre2));
+            (semestre3) => {
+              return new Profil(
+                new None(),
+                to_option(sexe3),
+                to_option(semestre3)
+              );
             }
           );
         }
       )
     );
-    let _pipe$12 = with_values(_pipe2, form_data);
-    let _pipe$22 = field(_pipe$12, "sexe", decode_sexe);
-    let _pipe$32 = field(_pipe$22, "semestre", decode_semestre);
-    let _pipe$42 = finish(_pipe$32);
-    return new UserSubmittedProfilForm(_pipe$42);
+    let _pipe$1 = with_values(_pipe, form_data);
+    let _pipe$2 = field(_pipe$1, "sexe", string);
+    let _pipe$3 = field(_pipe$2, "semestre", string);
+    let _pipe$4 = finish(_pipe$3);
+    return new UserSubmittedProfil(_pipe$4);
   };
-  let _block;
-  let _pipe = profil;
-  let _pipe$1 = then$(_pipe, (profil2) => {
-    return profil2.sexe;
-  });
-  let _pipe$2 = map(_pipe$1, encode_sexe);
-  _block = unwrap(_pipe$2, "");
-  let sexe = _block;
-  let _block$1;
-  let _pipe$3 = profil;
-  let _pipe$4 = then$(_pipe$3, (profil2) => {
-    return profil2.semestre;
-  });
-  let _pipe$5 = map(_pipe$4, encode_semestre);
-  _block$1 = unwrap(_pipe$5, "");
-  let semestre = _block$1;
+  let sexe2 = unwrap(profil.sexe, "");
+  let semestre2 = unwrap(profil.semestre, "");
   return form(
     toList([on_submit(handle_submit), class$("")]),
     toList([
-      fieldset_sexe(sexe),
-      fieldset_semestre(semestre),
+      sexe(
+        sexe2,
+        new Some((var0) => {
+          return new UserChangedSexe(var0);
+        })
+      ),
+      semestre(
+        semestre2,
+        new Some((var0) => {
+          return new UserChangedSemestre(var0);
+        })
+      ),
       button(
         toList([class$("btn"), type_("submit")]),
         toList([text3("Enregistrer")])
@@ -7407,147 +7460,140 @@ function view_accueil() {
     ])
   );
 }
-function main_form(accouchement) {
+function view_accouchement(profil, acc) {
   let validate_profil = () => {
-    return new Ok(
-      new Profil(new None(), new Some(new Homme()), new Some(new Pa2()))
-    );
-  };
-  let validate_accouchement = () => {
-    return new Ok(
-      new Accouchement(
-        accouchement.poste_chef,
-        accouchement.moment,
-        accouchement.instrument,
-        accouchement.autonomie,
-        encode_autonomie_raison(accouchement.raison)
-      )
-    );
+    return new Ok(new Profil(new None(), new Some("homme"), new Some("pa2")));
   };
   let handle_submit = () => {
-    let accouchement_form = validate_accouchement();
+    let accouchement_form = validate(acc);
     let _block2;
-    let $5 = accouchement.profil;
-    if ($5 instanceof Some) {
-      let $12 = validate_profil();
-      if ($12.isOk() && accouchement_form.isOk()) {
-        let profil_form = $12[0];
-        let accouchement$1 = accouchement_form[0];
-        _block2 = new Ok([new Some(profil_form), accouchement$1]);
+    if (profil instanceof Some) {
+      let $2 = validate_profil();
+      if ($2.isOk() && accouchement_form.isOk()) {
+        let profil_form = $2[0];
+        let accouchement = accouchement_form[0];
+        _block2 = new Ok([new Some(profil_form), accouchement]);
       } else {
         _block2 = new Error(void 0);
       }
     } else {
       if (accouchement_form.isOk()) {
-        let accouchement$1 = accouchement_form[0];
-        _block2 = new Ok([new None(), accouchement$1]);
+        let accouchement = accouchement_form[0];
+        _block2 = new Ok([new None(), accouchement]);
       } else {
         _block2 = new Error(void 0);
       }
     }
     let _pipe = _block2;
-    return new UserSubmittedAccouchementForm(_pipe);
+    return new UserSubmittedAccouchement(_pipe);
   };
+  let raison_params = new RaisonFieldSetParams(
+    (() => {
+      let $2 = acc.raison;
+      if ($2 instanceof RaisonProposee) {
+        let raison = $2[0];
+        return raison;
+      } else if ($2 instanceof RaisonLibre) {
+        return "autre";
+      } else {
+        return "";
+      }
+    })(),
+    new Some((var0) => {
+      return new UserChangedRaison(var0);
+    }),
+    (() => {
+      let $2 = acc.raison;
+      if ($2 instanceof RaisonProposee) {
+        return true;
+      } else if ($2 instanceof RaisonLibre) {
+        return false;
+      } else {
+        return true;
+      }
+    })(),
+    (() => {
+      let $2 = acc.raison;
+      if ($2 instanceof RaisonLibre) {
+        let raison = $2[0];
+        return raison;
+      } else {
+        return "";
+      }
+    })(),
+    new Some((var0) => {
+      return new UserChangedRaisonAutre(var0);
+    })
+  );
   let _block;
-  let $ = accouchement.raison;
-  if ($ instanceof Some && $[0] instanceof Proposed) {
-    let raison = $[0][0];
-    _block = raison;
-  } else if ($ instanceof Some && $[0] instanceof Other) {
-    _block = "autre";
+  let $ = acc.autonomie;
+  if ($ instanceof Some && $[0] === "observe") {
+    _block = toList([raison_observe(raison_params)]);
+  } else if ($ instanceof Some && $[0] === "aide_active") {
+    _block = toList([raison_aide_active(raison_params)]);
+  } else if ($ instanceof Some && $[0] === "aide_mineure") {
+    _block = toList([raison_aide_mineure(raison_params)]);
   } else {
-    _block = "";
+    _block = toList([]);
   }
-  let raison_radio_checked = _block;
-  let _block$1;
-  let $1 = accouchement.raison;
-  if ($1 instanceof Some && $1[0] instanceof Proposed) {
-    _block$1 = true;
-  } else if ($1 instanceof Some && $1[0] instanceof Other) {
-    _block$1 = false;
-  } else {
-    _block$1 = true;
-  }
-  let raison_other_is_disabled = _block$1;
-  let _block$2;
-  let $2 = accouchement.raison;
-  if ($2 instanceof Some && $2[0] instanceof Other) {
-    let raison = $2[0][0];
-    _block$2 = raison;
-  } else {
-    _block$2 = "";
-  }
-  let raison_other_input_value = _block$2;
-  let _block$3;
-  let $3 = accouchement.autonomie;
-  if ($3 === "observe") {
-    _block$3 = toList([
-      fieldset_autonomie_raison_observe(
-        raison_radio_checked,
-        raison_other_is_disabled,
-        raison_other_input_value
-      )
-    ]);
-  } else if ($3 === "aide_active") {
-    _block$3 = toList([
-      fieldset_autonomie_raison_aide_active(
-        raison_radio_checked,
-        raison_other_is_disabled,
-        raison_other_input_value
-      )
-    ]);
-  } else if ($3 === "aide_mineure") {
-    _block$3 = toList([
-      fieldset_autonomie_raison_aide_mineure(
-        raison_radio_checked,
-        raison_other_is_disabled,
-        raison_other_input_value
-      )
-    ]);
-  } else {
-    _block$3 = toList([]);
-  }
-  let questions = _block$3;
+  let questions = _block;
   let questions$1 = prepend(
-    fieldset_poste_chef(accouchement.poste_chef),
+    poste_chef(
+      unwrap(acc.poste_chef, ""),
+      new Some((var0) => {
+        return new UserChangedPosteChef(var0);
+      })
+    ),
     prepend(
-      fieldset_moment(accouchement.moment),
+      moment(
+        unwrap(acc.moment, ""),
+        new Some((var0) => {
+          return new UserChangedMoment(var0);
+        })
+      ),
       prepend(
-        fieldset_instrument(accouchement.instrument),
-        prepend(fieldset_autonomie(accouchement.autonomie), questions)
+        instrument(
+          unwrap(acc.instrument, ""),
+          new Some((var0) => {
+            return new UserChangedInstrument(var0);
+          })
+        ),
+        prepend(
+          autonomie(
+            unwrap(acc.autonomie, ""),
+            new Some((var0) => {
+              return new UserChangedAutonomie(var0);
+            })
+          ),
+          questions
+        )
       )
     )
   );
-  let _block$4;
-  let $4 = accouchement.profil;
-  if ($4 instanceof Some) {
-    let profil = $4[0];
-    let _block$5;
-    let $5 = profil.semestre;
-    if ($5 instanceof Some) {
-      let semestre = $5[0];
-      _block$5 = encode_semestre(semestre);
-    } else {
-      _block$5 = "";
-    }
-    let checked_semestre = _block$5;
-    let _block$6;
-    let $6 = profil.sexe;
-    if ($6 instanceof Some) {
-      let sexe = $6[0];
-      _block$6 = encode_sexe(sexe);
-    } else {
-      _block$6 = "";
-    }
-    let checked_sexe = _block$6;
-    _block$4 = prepend(
-      fieldset_sexe(checked_sexe),
-      prepend(fieldset_semestre(checked_semestre), questions$1)
+  let _block$1;
+  if (profil instanceof Some) {
+    let profil$1 = profil[0];
+    _block$1 = prepend(
+      sexe(
+        unwrap(profil$1.semestre, ""),
+        new Some((var0) => {
+          return new UserChangedSexe(var0);
+        })
+      ),
+      prepend(
+        semestre(
+          unwrap(profil$1.sexe, ""),
+          new Some((var0) => {
+            return new UserChangedSemestre(var0);
+          })
+        ),
+        questions$1
+      )
     );
   } else {
-    _block$4 = questions$1;
+    _block$1 = questions$1;
   }
-  let questions$2 = _block$4;
+  let questions$2 = _block$1;
   return form(
     toList([class$(""), on_click(handle_submit())]),
     flatten(
@@ -7563,12 +7609,6 @@ function main_form(accouchement) {
     )
   );
 }
-function view_accouchement(accouchement) {
-  return div(
-    toList([class$("")]),
-    toList([main_form(accouchement)])
-  );
-}
 function view(model) {
   let page = model.page;
   if (page instanceof ProfilPage) {
@@ -7577,8 +7617,9 @@ function view(model) {
   } else if (page instanceof LoginPage) {
     return view_login();
   } else if (page instanceof AccouchementPage) {
-    let form_state = page[0];
-    let _pipe = view_accouchement(form_state);
+    let profil = page[0][0];
+    let acc = page[0][1];
+    let _pipe = view_accouchement(profil, acc);
     return base_view(_pipe, page);
   } else {
     let _pipe = view_accueil();
@@ -7590,7 +7631,7 @@ var server_port = 8090;
 function init2(_) {
   let model = new Model(
     new$9(server_host, server_port),
-    new None(),
+    empty_profil(),
     new LoginPage()
   );
   let $ = init(server_host, server_port);
@@ -7613,7 +7654,7 @@ function main2() {
     throw makeError(
       "let_assert",
       "client",
-      21,
+      24,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }

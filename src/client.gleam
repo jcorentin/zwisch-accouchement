@@ -1,4 +1,6 @@
+import accouchement.{type Accouchement} as acc
 import components
+import fieldsets
 import formal/form
 import gleam/dynamic/decode.{type Decoder}
 import gleam/json
@@ -97,116 +99,6 @@ fn page_name(page: Page) {
   }
 }
 
-type Raison {
-  RaisonProposee(String)
-  RaisonLibre(String)
-  RaisonNone
-}
-
-fn encode_raison(raison: Raison) {
-  case raison {
-    RaisonProposee(choice) -> choice
-    RaisonLibre(choice) -> choice
-    RaisonNone -> ""
-  }
-}
-
-type Accouchement {
-  Accouchement(
-    user: String,
-    poste_chef: Option(String),
-    moment: Option(String),
-    instrument: Option(String),
-    autonomie: Option(String),
-    raison: Raison,
-  )
-}
-
-fn empty_accouchement(user_id: String) {
-  Accouchement(
-    user: user_id,
-    poste_chef: None,
-    moment: None,
-    instrument: None,
-    autonomie: None,
-    raison: RaisonNone,
-  )
-}
-
-fn decode_accouchement() {
-  use user <- decode.field("user", decode.string)
-  use poste_chef <- decode.field("poste_chef", decode.string)
-  use moment <- decode.field("moment", decode.string)
-  use instrument <- decode.field("instrument", decode.string)
-  use autonomie <- decode.field("autonomie", decode.string)
-  use raison <- decode.field("autonomie_raison", decode.string)
-  let raisons_proposees = [
-    "geste_difficile", "situation_urgence", "manque_confiance",
-    "changement_instrument", "cas_particulier", "guidance_technique",
-    "manque_experience", "changement_instrument", "execution_rapide",
-    "niveau_interne", "environnement_favorable", "gestes_interne",
-  ]
-  let is_raison_proposee = list.contains(raisons_proposees, raison)
-  let raison = case raison {
-    "" -> RaisonNone
-    raison if is_raison_proposee -> RaisonProposee(raison)
-    raison -> RaisonLibre(raison)
-  }
-  decode.success(Accouchement(
-    user:,
-    poste_chef: string.to_option(poste_chef),
-    moment: string.to_option(moment),
-    instrument: string.to_option(instrument),
-    autonomie: string.to_option(autonomie),
-    raison:,
-  ))
-}
-
-fn encode_accouchement(acc: Accouchement) {
-  let to_string = fn(opt) { option.unwrap(opt, "") |> json.string }
-  json.object([
-    #("user", json.string(acc.user)),
-    #("poste_chef", to_string(acc.poste_chef)),
-    #("moment", to_string(acc.moment)),
-    #("instrument", to_string(acc.instrument)),
-    #("autonomie", to_string(acc.autonomie)),
-    #("autonomie_raison", acc.raison |> encode_raison |> json.string),
-  ])
-  |> json.to_string()
-}
-
-fn validate_accouchement(acc: Accouchement) {
-  let validate_fields =
-    [
-      #("poste_chef", acc.poste_chef),
-      #("moment", acc.moment),
-      #("instrument", acc.instrument),
-      #("autonomie", acc.autonomie),
-    ]
-    |> list.map(fn(item) {
-      let #(name, value) = item
-      option.to_result(value, #(name, "empty_error"))
-    })
-  let validate_raison = case acc.raison {
-    RaisonNone -> Error(#("autonomie_raison", "empty_error"))
-    RaisonLibre("") -> Error(#("autonomie_raison", "empty_other_error"))
-    _ -> Ok("")
-  }
-
-  let errors =
-    [validate_raison, ..validate_fields]
-    |> list.filter_map(fn(item) {
-      case item {
-        Error(err) -> Ok(err)
-        Ok(_) -> Error(Nil)
-      }
-    })
-  case list.is_empty(errors) {
-    True -> Ok(acc)
-    False -> Error(errors)
-  }
-}
-
 // UPDATE ----------------------------------------------------------------------
 
 type LoginData {
@@ -250,7 +142,11 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserChangedAutonomie(new_autonomie) -> {
       let assert AccouchementPage(#(profil, acc)) = model.page
       let new_acc =
-        Accouchement(..acc, autonomie: Some(new_autonomie), raison: RaisonNone)
+        acc.Accouchement(
+          ..acc,
+          autonomie: Some(new_autonomie),
+          raison: acc.RaisonNone,
+        )
       #(
         Model(..model, page: AccouchementPage(#(profil, new_acc))),
         effect.none(),
@@ -258,7 +154,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
     UserChangedRaison("autre") -> {
       let assert AccouchementPage(#(profil, acc)) = model.page
-      let new_acc = Accouchement(..acc, raison: RaisonLibre(""))
+      let new_acc = acc.Accouchement(..acc, raison: acc.RaisonLibre(""))
       #(
         Model(..model, page: AccouchementPage(#(profil, new_acc))),
         effect.none(),
@@ -266,7 +162,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
     UserChangedRaison(raison) -> {
       let assert AccouchementPage(#(profil, acc)) = model.page
-      let new_acc = Accouchement(..acc, raison: RaisonProposee(raison))
+      let new_acc = acc.Accouchement(..acc, raison: acc.RaisonProposee(raison))
       #(
         Model(..model, page: AccouchementPage(#(profil, new_acc))),
         effect.none(),
@@ -314,7 +210,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
             Some(sexe), Some(semestre) -> None
             sexe, semestre -> Some(Profil(name: None, sexe:, semestre:))
           }
-          AccouchementPage(#(profil, empty_accouchement(user_id)))
+          AccouchementPage(#(profil, acc.empty(user_id)))
         }
         "Profil" -> ProfilPage
         "Accueil" -> AccueilPage
@@ -369,8 +265,8 @@ fn submit_accouchement(pb: PocketBase, acc: Accouchement) -> Effect(Msg) {
   pb.create_one_record(
     pb,
     "accouchements",
-    encode_accouchement(acc),
-    decode_accouchement(),
+    acc.encode(acc),
+    acc.decode(),
     ApiReturnedAccouchement,
   )
 }
@@ -427,234 +323,6 @@ fn view_profil(profil: Profil) -> Element(Msg) {
   ])
 }
 
-fn fieldset_sexe(checked: String) {
-  components.RadioFieldSet(
-    name: "sexe",
-    legend: "Êtes-vous … ?",
-    choices: [
-      #("femme", html.text("Une femme")),
-      #("homme", html.text("Un homme")),
-    ],
-    checked:,
-    on_change: Some(UserChangedSexe),
-  )
-  |> components.render_radio_fieldset()
-}
-
-fn fieldset_semestre(checked: String) {
-  components.RadioFieldSet(
-    name: "semestre",
-    legend: "En quel semestre êtes-vous ?",
-    choices: [
-      #("ps", html.text("Phase socle")),
-      #("pa2", html.text("Phase d’approfondissement : 2ème année")),
-      #("pa3", html.text("Phase d’approfondissement : 3ème année")),
-      #("pa4", html.text("Phase d’approfondissement : 4ème année")),
-      #("dj1", html.text("Docteur junior : 1ère année")),
-      #("dj2", html.text("Docteur junior : 2ème année")),
-    ],
-    checked:,
-    on_change: Some(UserChangedSemestre),
-  )
-  |> components.render_radio_fieldset()
-}
-
-fn fieldset_poste_chef(checked: String) {
-  components.RadioFieldSet(
-    name: "poste_chef",
-    legend: "Quel poste occupe le chef ?",
-    choices: [
-      #("ph", html.text("Practicien Hospitalier")),
-      #("assistant", html.text("Assistant")),
-      #("dj", html.text("Docteur Junior")),
-    ],
-    checked:,
-    on_change: Some(UserChangedPosteChef),
-  )
-  |> components.render_radio_fieldset()
-}
-
-fn fieldset_moment(checked: String) {
-  components.RadioFieldSet(
-    name: "moment",
-    legend: "A quel moment de la journée a eu lieu l’accouchement ?",
-    choices: [
-      #("journee_semaine", html.text("Jour de semaine, 8h-18h")),
-      #("journee_weekend", html.text("Jour de week-end, 8h-18h")),
-      #("debut_nuit", html.text("18h-minuit")),
-      #("fin_nuit", html.text("minuit-8h")),
-    ],
-    checked:,
-    on_change: Some(UserChangedMoment),
-  )
-  |> components.render_radio_fieldset()
-}
-
-fn fieldset_instrument(checked: String) {
-  components.RadioFieldSet(
-    name: "instrument",
-    legend: "Quel instrument a permis l’accouchement ?",
-    choices: [
-      #("ventouse", html.text("Ventouse")),
-      #("forceps", html.text("Forceps")),
-      #("spatule", html.text("Spatule")),
-    ],
-    checked:,
-    on_change: Some(UserChangedInstrument),
-  )
-  |> components.render_radio_fieldset()
-}
-
-fn fieldset_autonomie(checked: String) {
-  components.RadioFieldSet(
-    name: "autonomie",
-    legend: "Avec quel niveau d’autonomie l’interne a-t-il/elle réalisé l’accouchement ?",
-    choices: [
-      #(
-        "observe",
-        html.text(
-          "Il/elle a uniquement observé – Le chef a réalisé le geste pendant que l’interne observait",
-        ),
-      ),
-      #(
-        "aide_active",
-        html.text(
-          "Il/elle a participé avec une aide active – L’interne fait avec le chef (nécessité d’une grande d’aide)",
-        ),
-      ),
-      #(
-        "aide_mineure",
-        html.text(
-          "Il/elle a eu une aide mineure  - le chef aide l’interne avec un minimum d’intervention nécessaire",
-        ),
-      ),
-      #(
-        "sans_aide",
-        html.text(
-          "Il/elle a pratiqué en autonomie – L’interne a réalisé le geste seul(e), sous observation passive du chef",
-        ),
-      ),
-    ],
-    checked:,
-    on_change: Some(UserChangedAutonomie),
-  )
-  |> components.render_radio_fieldset()
-}
-
-fn fieldset_autonomie_raison_observe(
-  checked: String,
-  other_is_disabled: Bool,
-  other_value: String,
-) {
-  components.RadioFieldSet(
-    name: "autonomie_raison",
-    legend: "Quelle est la principale raison pour laquelle l’interne n’a pas pu réalisé le geste ?",
-    choices: [
-      #("geste_difficile", html.text("Le geste était difficile")),
-      #(
-        "situation_urgence",
-        html.text("Nous étions dans une situation d’urgence"),
-      ),
-      #("manque_confiance", html.text("Manque de confiance envers l’interne")),
-      #("changement_instrument", html.text("Changement d’instrument")),
-      #(
-        "cas_particulier",
-        html.text("Cas particulier : Patiente suivie par le chef / V.I.P"),
-      ),
-      #(
-        "autre",
-        components.render_autre_input_field(
-          is_disabled: other_is_disabled,
-          value: other_value,
-          on_input: Some(UserChangedRaisonAutre),
-        ),
-      ),
-    ],
-    checked:,
-    on_change: Some(UserChangedRaison),
-  )
-  |> components.render_radio_fieldset()
-}
-
-fn fieldset_autonomie_raison_aide_active(
-  checked: String,
-  other_is_disabled: Bool,
-  other_value: String,
-) {
-  components.RadioFieldSet(
-    name: "autonomie_raison",
-    legend: "Pourquoi avez-vous estimé nécessaire d’aider activement l’interne ?",
-    choices: [
-      #(
-        "guidance_technique",
-        html.text("Le geste nécessitait une guidance technique"),
-      ),
-      #(
-        "manque_experience",
-        html.text("L’interne manquait d’expérience sur ce geste"),
-      ),
-      #("changement_instrument", html.text("Changement d’instrument")),
-      #(
-        "execution_rapide",
-        html.text("La situation nécessitait une exécution rapide"),
-      ),
-      #(
-        "autre",
-        components.render_autre_input_field(
-          is_disabled: other_is_disabled,
-          value: other_value,
-          on_input: Some(UserChangedRaisonAutre),
-        ),
-      ),
-    ],
-    checked:,
-    on_change: Some(UserChangedRaison),
-  )
-  |> components.render_radio_fieldset()
-}
-
-fn fieldset_autonomie_raison_aide_mineure(
-  checked: String,
-  other_is_disabled: Bool,
-  other_value: String,
-) {
-  components.RadioFieldSet(
-    name: "autonomie_raison",
-    legend: "Pourquoi avez-vous choisi de laisser l’interne avec une aide mineure ?",
-    choices: [
-      #(
-        "niveau_interne",
-        html.text(
-          "Niveau de l’interne compatible avec le fait de laisser faire",
-        ),
-      ),
-      #(
-        "environnement_favorable",
-        html.text(
-          "L’environnement était favorable à l’apprentissage (temps / contexte)",
-        ),
-      ),
-      #(
-        "gestes_interne",
-        html.text(
-          "Gestes de l’interne compatible avec une aide à minima jusqu’à la fin",
-        ),
-      ),
-      #(
-        "autre",
-        components.render_autre_input_field(
-          is_disabled: other_is_disabled,
-          value: other_value,
-          on_input: Some(UserChangedRaisonAutre),
-        ),
-      ),
-    ],
-    checked:,
-    on_change: Some(UserChangedRaison),
-  )
-  |> components.render_radio_fieldset()
-}
-
 fn view_profil_form(profil: Profil) -> Element(Msg) {
   let handle_submit = fn(form_data) {
     form.decoding({
@@ -677,8 +345,8 @@ fn view_profil_form(profil: Profil) -> Element(Msg) {
   let semestre = option.unwrap(profil.semestre, "")
 
   html.form([event.on_submit(handle_submit), attribute.class("")], [
-    fieldset_sexe(sexe),
-    fieldset_semestre(semestre),
+    fieldsets.sexe(sexe, Some(UserChangedSexe)),
+    fieldsets.semestre(semestre, Some(UserChangedSemestre)),
     html.button([attribute.class("btn"), attribute.type_("submit")], [
       html.text("Enregistrer"),
     ]),
@@ -753,7 +421,7 @@ fn view_accouchement(profil: Option(Profil), acc: Accouchement) -> Element(Msg) 
     Ok(Profil(name: None, sexe: Some("homme"), semestre: Some("pa2")))
   }
   let handle_submit = fn() -> Msg {
-    let accouchement_form = validate_accouchement(acc)
+    let accouchement_form = acc.validate(acc)
     case profil {
       Some(_) -> {
         case validate_profil(), accouchement_form {
@@ -771,59 +439,62 @@ fn view_accouchement(profil: Option(Profil), acc: Accouchement) -> Element(Msg) 
     }
     |> UserSubmittedAccouchement
   }
-  let raison_radio_checked = case acc.raison {
-    RaisonProposee(raison) -> raison
-    RaisonLibre(_raison) -> "autre"
-    RaisonNone -> ""
-  }
-  let raison_other_is_disabled = case acc.raison {
-    RaisonProposee(_raison) -> True
-    RaisonLibre(_raison) -> False
-    RaisonNone -> True
-  }
-  let raison_other_input_value = case acc.raison {
-    RaisonLibre(raison) -> raison
-    _ -> ""
-  }
+
+  let raison_params =
+    fieldsets.RaisonFieldSetParams(
+      radio_checked: case acc.raison {
+        acc.RaisonProposee(raison) -> raison
+        acc.RaisonLibre(_raison) -> "autre"
+        acc.RaisonNone -> ""
+      },
+      on_radio_change: Some(UserChangedRaison),
+      input_is_disabled: case acc.raison {
+        acc.RaisonProposee(_raison) -> True
+        acc.RaisonLibre(_raison) -> False
+        acc.RaisonNone -> True
+      },
+      input_value: case acc.raison {
+        acc.RaisonLibre(raison) -> raison
+        _ -> ""
+      },
+      on_input_change: Some(UserChangedRaisonAutre),
+    )
 
   let questions = case acc.autonomie {
-    Some("observe") -> [
-      fieldset_autonomie_raison_observe(
-        raison_radio_checked,
-        raison_other_is_disabled,
-        raison_other_input_value,
-      ),
-    ]
-    Some("aide_active") -> [
-      fieldset_autonomie_raison_aide_active(
-        raison_radio_checked,
-        raison_other_is_disabled,
-        raison_other_input_value,
-      ),
-    ]
-    Some("aide_mineure") -> [
-      fieldset_autonomie_raison_aide_mineure(
-        raison_radio_checked,
-        raison_other_is_disabled,
-        raison_other_input_value,
-      ),
-    ]
+    Some("observe") -> [fieldsets.raison_observe(raison_params)]
+    Some("aide_active") -> [fieldsets.raison_aide_active(raison_params)]
+    Some("aide_mineure") -> [fieldsets.raison_aide_mineure(raison_params)]
     _ -> []
   }
 
   let questions = [
-    fieldset_poste_chef(option.unwrap(acc.poste_chef, "")),
-    fieldset_moment(option.unwrap(acc.moment, "")),
-    fieldset_instrument(option.unwrap(acc.instrument, "")),
-    fieldset_autonomie(option.unwrap(acc.autonomie, "")),
+    fieldsets.poste_chef(
+      option.unwrap(acc.poste_chef, ""),
+      Some(UserChangedPosteChef),
+    ),
+    fieldsets.moment(option.unwrap(acc.moment, ""), Some(UserChangedMoment)),
+    fieldsets.instrument(
+      option.unwrap(acc.instrument, ""),
+      Some(UserChangedInstrument),
+    ),
+    fieldsets.autonomie(
+      option.unwrap(acc.autonomie, ""),
+      Some(UserChangedAutonomie),
+    ),
     ..questions
   ]
 
   let questions = case profil {
     Some(profil) -> {
       [
-        fieldset_sexe(option.unwrap(profil.semestre, "")),
-        fieldset_semestre(option.unwrap(profil.sexe, "")),
+        fieldsets.sexe(
+          option.unwrap(profil.semestre, ""),
+          Some(UserChangedSexe),
+        ),
+        fieldsets.semestre(
+          option.unwrap(profil.sexe, ""),
+          Some(UserChangedSemestre),
+        ),
         ..questions
       ]
     }
