@@ -200,14 +200,6 @@ pub fn raison_aide_active(params: RaisonFieldSetParams(a)) -> Element(a) {
           "execution_rapide",
           html.text("La situation nécessitait une exécution rapide"),
         ),
-        #(
-          "autre",
-          components.render_autre_input_field(
-            is_disabled: params.input_is_disabled,
-            value: params.input_value,
-            on_input: params.on_input_change,
-          ),
-        ),
       ],
       base.choices,
     ),
@@ -255,7 +247,9 @@ fn base_autonomie_raison(params: RaisonFieldSetParams(a)) {
     choices: [
       #(
         "autre",
-        components.render_autre_input_field(
+        components.render_input_field(
+          prompt: "Autre :",
+          placeholder: "Veuillez préciser",
           is_disabled: params.input_is_disabled,
           value: params.input_value,
           on_input: params.on_input_change,

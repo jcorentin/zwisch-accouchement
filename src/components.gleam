@@ -66,20 +66,6 @@ fn render_radio_choice(
   ])
 }
 
-pub fn render_autre_input_field(
-  is_disabled is_disabled: Bool,
-  value value: String,
-  on_input on_input: Option(fn(String) -> a),
-) -> Element(a) {
-  render_input_field(
-    prompt: "Autre :",
-    placeholder: "Veuillez préciser",
-    is_disabled:,
-    value:,
-    on_input:,
-  )
-}
-
 pub fn render_input_field(
   prompt prompt: String,
   placeholder placeholder: String,
