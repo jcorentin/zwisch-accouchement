@@ -1,3 +1,5 @@
+import fieldsets
+import gleam/dict
 import gleam/dynamic/decode
 import gleam/json
 import gleam/list
@@ -10,7 +12,16 @@ pub type Raison {
   RaisonNone
 }
 
-pub fn encode_raison(raison: Raison) -> String {
+fn decode_raison(raison: String) -> Raison {
+  let is_raison_proposee = list.contains(fieldsets.raisons_proposees, raison)
+  case raison {
+    "" -> RaisonNone
+    raison if is_raison_proposee -> RaisonProposee(raison)
+    raison -> RaisonLibre(raison)
+  }
+}
+
+fn encode_raison(raison: Raison) -> String {
   case raison {
     RaisonProposee(choice) -> choice
     RaisonLibre(choice) -> choice
@@ -47,25 +58,13 @@ pub fn decode() -> decode.Decoder(Accouchement) {
   use instrument <- decode.field("instrument", decode.string)
   use autonomie <- decode.field("autonomie", decode.string)
   use raison <- decode.field("autonomie_raison", decode.string)
-  let raisons_proposees = [
-    "geste_difficile", "situation_urgence", "manque_confiance",
-    "changement_instrument", "cas_particulier", "guidance_technique",
-    "manque_experience", "changement_instrument", "execution_rapide",
-    "niveau_interne", "environnement_favorable", "gestes_interne",
-  ]
-  let is_raison_proposee = list.contains(raisons_proposees, raison)
-  let raison = case raison {
-    "" -> RaisonNone
-    raison if is_raison_proposee -> RaisonProposee(raison)
-    raison -> RaisonLibre(raison)
-  }
   decode.success(Accouchement(
     user:,
     poste_chef: string.to_option(poste_chef),
     moment: string.to_option(moment),
     instrument: string.to_option(instrument),
     autonomie: string.to_option(autonomie),
-    raison:,
+    raison: decode_raison(raison),
   ))
 }
 

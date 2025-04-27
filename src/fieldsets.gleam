@@ -4,6 +4,13 @@ import gleam/option.{type Option}
 import lustre/element.{type Element}
 import lustre/element/html
 
+pub const raisons_proposees = [
+  "geste_difficile", "situation_urgence", "manque_confiance",
+  "changement_instrument", "cas_particulier", "guidance_technique",
+  "manque_experience", "changement_instrument", "execution_rapide",
+  "niveau_interne", "environnement_favorable", "gestes_interne",
+]
+
 pub type RaisonFieldSetParams(a) {
   RaisonFieldSetParams(
     radio_checked: String,
