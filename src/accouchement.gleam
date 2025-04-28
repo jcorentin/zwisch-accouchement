@@ -1,53 +1,19 @@
-import fieldsets
-import gleam/dict
+import answer.{type Answer}
+import gleam/dict.{type Dict}
 import gleam/dynamic/decode
-import gleam/json
-import gleam/list
-import gleam/option.{type Option, None}
+import gleam/json.{type Json}
+import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
-
-pub type Raison {
-  RaisonProposee(String)
-  RaisonLibre(String)
-  RaisonNone
-}
-
-fn decode_raison(raison: String) -> Raison {
-  let is_raison_proposee = list.contains(fieldsets.raisons_proposees, raison)
-  case raison {
-    "" -> RaisonNone
-    raison if is_raison_proposee -> RaisonProposee(raison)
-    raison -> RaisonLibre(raison)
-  }
-}
-
-fn encode_raison(raison: Raison) -> String {
-  case raison {
-    RaisonProposee(choice) -> choice
-    RaisonLibre(choice) -> choice
-    RaisonNone -> ""
-  }
-}
 
 pub type Accouchement {
   Accouchement(
     user: String,
-    poste_chef: Option(String),
-    moment: Option(String),
-    instrument: Option(String),
-    autonomie: Option(String),
-    raison: Raison,
-  )
-}
-
-pub fn empty(user_id: String) -> Accouchement {
-  Accouchement(
-    user: user_id,
-    poste_chef: None,
-    moment: None,
-    instrument: None,
-    autonomie: None,
-    raison: RaisonNone,
+    poste_chef: String,
+    moment: String,
+    instrument: String,
+    autonomie: String,
+    raison: Option(String),
   )
 }
 
@@ -60,57 +26,111 @@ pub fn decode() -> decode.Decoder(Accouchement) {
   use raison <- decode.field("autonomie_raison", decode.string)
   decode.success(Accouchement(
     user:,
-    poste_chef: string.to_option(poste_chef),
-    moment: string.to_option(moment),
-    instrument: string.to_option(instrument),
-    autonomie: string.to_option(autonomie),
-    raison: decode_raison(raison),
+    poste_chef:,
+    moment:,
+    instrument:,
+    autonomie:,
+    raison: string.to_option(raison),
   ))
 }
 
-pub fn encode(acc: Accouchement) -> String {
-  let to_string = fn(opt) { option.unwrap(opt, "") |> json.string }
+pub fn encode(acc: Accouchement) -> Json {
   json.object([
     #("user", json.string(acc.user)),
-    #("poste_chef", to_string(acc.poste_chef)),
-    #("moment", to_string(acc.moment)),
-    #("instrument", to_string(acc.instrument)),
-    #("autonomie", to_string(acc.autonomie)),
-    #("autonomie_raison", acc.raison |> encode_raison |> json.string),
+    #("poste_chef", json.string(acc.poste_chef)),
+    #("moment", json.string(acc.moment)),
+    #("instrument", json.string(acc.instrument)),
+    #("autonomie", json.string(acc.autonomie)),
+    #("autonomie_raison", acc.raison |> option.unwrap("") |> json.string),
   ])
-  |> json.to_string()
 }
 
-pub fn validate(
-  acc: Accouchement,
-) -> Result(Accouchement, dict.Dict(String, String)) {
-  let validate_fields =
-    [
-      #("poste_chef", acc.poste_chef),
-      #("moment", acc.moment),
-      #("instrument", acc.instrument),
-      #("autonomie", acc.autonomie),
-    ]
-    |> list.map(fn(item) {
-      let #(name, value) = item
-      option.to_result(value, #(name, "empty_error"))
-    })
-  let validate_raison = case acc.raison {
-    RaisonNone -> Error(#("autonomie_raison", "empty_error"))
-    RaisonLibre("") -> Error(#("autonomie_raison", "empty_other_error"))
-    _ -> Ok("")
-  }
+pub type Question {
+  PosteChef
+  Moment
+  Instrument
+  Autonomie
+  Raison(Autonomie)
+}
 
-  let errors =
-    [validate_raison, ..validate_fields]
-    |> list.filter_map(fn(item) {
-      case item {
-        Error(err) -> Ok(err)
-        Ok(_) -> Error(Nil)
+pub type Autonomie {
+  Observe
+  AideActive
+  AideMineure
+}
+
+pub fn questions_to_accouchement(
+  questions: Dict(Question, Answer),
+  user_id: String,
+) -> Result(Accouchement, Nil) {
+  let questions =
+    answer.validate_multiple(questions)
+    |> result.replace_error(Nil)
+  use validated_questions <- result.try(questions)
+  use poste_chef <- result.try(dict.get(validated_questions, PosteChef))
+  use moment <- result.try(dict.get(validated_questions, Moment))
+  use instrument <- result.try(dict.get(validated_questions, Instrument))
+  use autonomie <- result.try(dict.get(validated_questions, Autonomie))
+  use raison <- result.try(case autonomie {
+    "observe" ->
+      validated_questions |> dict.get(Raison(Observe)) |> result.map(Some)
+    "aide_active" ->
+      validated_questions
+      |> dict.get(Raison(AideActive))
+      |> result.map(Some)
+    "aide_mineure" ->
+      validated_questions
+      |> dict.get(Raison(AideMineure))
+      |> result.map(Some)
+    "sans_aide" -> Ok(None)
+    _ -> Error(Nil)
+  })
+  Ok(Accouchement(
+    user: user_id,
+    poste_chef:,
+    moment:,
+    instrument:,
+    autonomie:,
+    raison:,
+  ))
+}
+
+pub fn new_questions() -> Dict(Question, Answer) {
+  [
+    #(PosteChef, answer.NoAnswer),
+    #(Moment, answer.NoAnswer),
+    #(Instrument, answer.NoAnswer),
+    #(Autonomie, answer.NoAnswer),
+  ]
+  |> dict.from_list()
+}
+
+pub fn update_questions(questions, update) {
+  let #(question, answer) = update
+  let questions = dict.insert(questions, question, answer)
+  let upsert_raison = fn(raison_question) {
+    dict.upsert(questions, raison_question, fn(existing_answer) {
+      case existing_answer {
+        Some(answer) -> answer
+        None -> answer.NoAnswer
       }
     })
-  case list.is_empty(errors) {
-    True -> Ok(acc)
-    False -> Error(dict.from_list(errors))
+  }
+  case dict.get(questions, Autonomie) {
+    Ok(answer.Proposed("observe")) ->
+      upsert_raison(Raison(Observe))
+      |> dict.drop([Raison(AideActive), Raison(AideMineure)])
+    Ok(answer.Proposed("aide_active")) ->
+      upsert_raison(Raison(AideActive))
+      |> dict.drop([Raison(Observe), Raison(AideMineure)])
+    Ok(answer.Proposed("aide_mineure")) ->
+      upsert_raison(Raison(AideMineure))
+      |> dict.drop([Raison(Observe), Raison(AideActive)])
+    _ ->
+      dict.drop(questions, [
+        Raison(Observe),
+        Raison(AideActive),
+        Raison(AideMineure),
+      ])
   }
 }
